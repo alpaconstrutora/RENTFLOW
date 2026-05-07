@@ -25,7 +25,7 @@ export async function loginWithMagicLink(formData: FormData) {
 
   // Lógica inteligente pura do Next.js sem usar um pingo de JavaScript no front-end.
   // Avança a etapa via Search Params!
-  return redirect(`/login?step=verify&email=${encodeURIComponent(email)}&message=Cheque o Mailpit!`)
+  return redirect(`/login?step=verify&email=${encodeURIComponent(email)}&message=Código enviado!`)
 }
 
 export async function verifyOtpCode(formData: FormData) {
@@ -41,7 +41,7 @@ export async function verifyOtpCode(formData: FormData) {
   const { error } = await supabase.auth.verifyOtp({ 
     email, 
     token, 
-    type: 'magiclink' // O Supabase reconhece códigos OTP via a configuração de links
+    type: 'email'
   })
 
   if (error) {

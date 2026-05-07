@@ -1,8 +1,15 @@
 import Link from 'next/link'
 import { ArrowRight, KeyRound } from 'lucide-react'
 import styles from './landing.module.css'
+import { redirect } from 'next/navigation'
 
-export default function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
+  if (error) redirect('/login?message=Link expirado. Solicite um novo código abaixo.')
   return (
     <div className={styles.container}>
       <div className={styles.glowTop} />
