@@ -1,0 +1,1 @@
+SET ROLE authenticated; SELECT count(*) FROM transactions_view;

@@ -1,0 +1,1 @@
+SELECT id, name, timezone FROM profiles LIMIT 10;
