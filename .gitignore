@@ -54,3 +54,4 @@ out.log
 next-env.d.ts
 
 .vercel
+supabase-utf8.json
