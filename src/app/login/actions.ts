@@ -20,7 +20,7 @@ export async function loginWithMagicLink(formData: FormData) {
   })
 
   if (error) {
-    return redirect(`/login?message=${encodeURIComponent(`[DEBUG] ${error.status} — ${error.message}`)}`)
+    return redirect('/login?message=Não foi possível despachar o código. Erro no servidor.')
   }
 
   // Lógica inteligente pura do Next.js sem usar um pingo de JavaScript no front-end.
