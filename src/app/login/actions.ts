@@ -20,7 +20,7 @@ export async function loginWithMagicLink(formData: FormData) {
   })
 
   if (error) {
-    return redirect('/login?message=Não foi possível despachar o código. Erro no servidor.')
+    return redirect(`/login?message=${encodeURIComponent(`[DEBUG] ${error.status} — ${error.message}`)}`)
   }
 
   // Lógica inteligente pura do Next.js sem usar um pingo de JavaScript no front-end.
@@ -32,8 +32,8 @@ export async function verifyOtpCode(formData: FormData) {
   const email = formData.get('email') as string
   const token = formData.get('token') as string
 
-  if (!token || token.length !== 6) {
-    return redirect(`/login?step=verify&email=${encodeURIComponent(email)}&message=Código de 6 dígitos inválido.`)
+  if (!token || token.length < 6 || token.length > 8) {
+    return redirect(`/login?step=verify&email=${encodeURIComponent(email)}&message=Código inválido (6-8 dígitos esperados).`)
   }
 
   const supabase = await createClient()
