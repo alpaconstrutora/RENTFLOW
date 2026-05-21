@@ -3,8 +3,8 @@ import { cookies } from 'next/headers'
 
 export async function createClientWithUser() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  return { supabase, user: session?.user ?? null }
+  const { data: { user } } = await supabase.auth.getUser()
+  return { supabase, user }
 }
 
 export async function createClient() {
