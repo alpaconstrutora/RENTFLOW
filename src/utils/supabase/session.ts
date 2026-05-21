@@ -37,10 +37,12 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
+  // getSession() lê o JWT do cookie localmente — sem chamada de rede para tokens válidos.
+  // A validação completa acontece nas pages via getUser().
   let user = null
   try {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
+    const { data } = await supabase.auth.getSession()
+    user = data.session?.user ?? null
   } catch {
     // Edge runtime: se Supabase não estiver acessível, trata como não autenticado
   }
