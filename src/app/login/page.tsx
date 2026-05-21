@@ -68,8 +68,8 @@ export default async function LoginPage({
                   id="token"
                   name="token"
                   type="text"
-                  maxLength={6}
-                  placeholder="000000"
+                  maxLength={8}
+                  placeholder="00000000"
                   required
                   autoComplete="one-time-code"
                   className={styles.input}
@@ -87,7 +87,7 @@ export default async function LoginPage({
                 <Key size={20} className={styles.btnIcon} />
               </button>
 
-              {message && message !== 'Cheque o Mailpit!' && (
+              {message && message !== 'Código enviado!' && (
                 <div className={styles.messageBox} style={{marginTop: '0.5rem'}}>
                   <p className={styles.message} style={{ background: 'rgba(255,50,50,0.1)', color: '#ffaaaa', borderColor: 'rgba(255,50,50,0.2)'}}>
                     {message}

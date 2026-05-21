@@ -13,11 +13,11 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient()
 
   // I6: Construir query filtrada via URL params (server-side)
+  // Invariante #13 — leitura via view, nunca tabela direta
   let query = supabase
     .from('transactions_view')
     .select('id, type, amount, net_amount, discount_amount, addition_amount, adjustment_notes, due_date, paid_date, billing_month, status, xmin, notes, is_auto_generated, property_id, property_name, tenant_name, recurrence_group_id, category_id, created_at')
 
-  // Invariante #13 — leitura via view, nunca tabela direta
   if (resolvedParams.mes) {
     query = query.eq('billing_month', resolvedParams.mes + '-01')
   } else if (resolvedParams.ano) {
@@ -32,21 +32,27 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
     query = query.eq('type', resolvedParams.tipo)
   }
   if (resolvedParams.status) {
-    // Se filtro de status inclui 'cancelled', precisamos considerar que a view exclui cancelled
-    // Para simplicidade do MVP, status cancelled nunca aparece (filtrado pela view)
     query = query.eq('status', resolvedParams.status)
   }
 
-  const { data: transactions, error } = await query.order('due_date', { ascending: false })
+  const [
+    { data: transactions, error },
+    { data: properties },
+    { data: leases },
+    { data: categories },
+    { data: allMonthsRaw },
+  ] = await Promise.all([
+    query.order('due_date', { ascending: false }).limit(500),
+    supabase.from('properties').select('id, name').order('name').limit(200),
+    supabase.from('leases').select('id, property_id, rent_value').eq('active', true).limit(200),
+    supabase.from('categories').select('id, name, type').order('name').limit(100),
+    // query leve só para popular o seletor de meses — sem dados, só billing_month
+    supabase.from('transactions_view').select('billing_month').order('billing_month', { ascending: false }),
+  ])
 
-  // Buscar imóveis e contratos para o modal de Nova Transação (I5)
-  const { data: properties } = await supabase.from('properties').select('id, name').order('name')
-  const { data: leases } = await supabase.from('leases').select('id, property_id, rent_value').eq('active', true)
-  const { data: categories } = await supabase.from('categories').select('id, name, type').order('name')
-
-  // Extrair meses únicos para o filtro
+  // Meses únicos para o filtro (fonte separada, não limitada pelo filtro ativo)
   const uniqueMonths = [...new Set(
-    transactions?.map(t => t.billing_month?.split('T')[0] ?? '').filter(Boolean) ?? []
+    allMonthsRaw?.map(t => t.billing_month?.split('T')[0] ?? '').filter(Boolean) ?? []
   )].sort().reverse()
 
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)

@@ -45,13 +45,9 @@ export async function createTransactionAction(formData: FormData) {
 
     if (error) return error.message
 
-    // I10: domain_event — criação manual de transação
-    await supabase.from('domain_events').insert({
-      user_id: user.id,
-      event_type: 'payment_received',
-      event_version: 1,
-      source: 'user',
-      payload: {
+    await supabase.rpc('log_domain_event', {
+      p_event_type: 'payment_received',
+      p_payload: {
         entity_id: null,
         entity_type: 'transaction',
         timestamp: new Date().toISOString(),

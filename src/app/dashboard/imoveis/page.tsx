@@ -40,46 +40,27 @@ export default async function ImoveisPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: propertiesRaw } = await supabase
-    .from('properties')
-    .select(`
-      id, name, type, status, expected_rent, purchase_value, address, notes,
-      leases ( rent_value, active )
-    `)
-    .eq('user_id', user?.id ?? '')
-    .order('created_at', { ascending: false })
+  const [{ data: propertiesRaw }, { data: profitSummary }] = await Promise.all([
+    supabase
+      .from('properties')
+      .select(`
+        id, name, type, status, expected_rent, purchase_value,
+        address, notes, photo_url,
+        zip_code, street, street_number, district, city, state,
+        leases ( rent_value, active )
+      `)
+      .eq('user_id', user?.id ?? '')
+      .order('created_at', { ascending: false }),
+    supabase.rpc('get_property_profit_summary'),
+  ])
 
-  // photo_url — migration 20260424000002 (bucket)
-  const { data: photoRaw } = await supabase
-    .from('properties')
-    .select('id, photo_url')
-    .eq('user_id', user?.id ?? '')
+  const properties = (propertiesRaw ?? []) as PropertyRow[]
 
-  // address columns — migration 20260424000003 (pode não existir ainda)
-  const { data: addrRaw } = await supabase
-    .from('properties')
-    .select('id, zip_code, street, street_number, district, city, state')
-    .eq('user_id', user?.id ?? '')
-
-  const extMap: Record<string, Partial<PropertyRow>> = {}
-  for (const r of photoRaw ?? []) extMap[r.id] = { ...extMap[r.id], ...r }
-  for (const r of addrRaw  ?? []) extMap[r.id] = { ...extMap[r.id], ...r }
-
-  const properties = (propertiesRaw ?? []).map(p => ({ ...p, ...extMap[p.id] })) as PropertyRow[]
-
-  const { data: profitByProperty } = await supabase
-    .from('transactions_view')
-    .select('property_id, type, net_amount, billing_month')
-    .eq('status', 'paid')
-
-  const profitMap: Record<string, number>    = {}
-  const monthsMap: Record<string, Set<string>> = {}
-  for (const tx of profitByProperty || []) {
-    const pid = tx.property_id
-    if (!profitMap[pid]) profitMap[pid] = 0
-    if (!monthsMap[pid]) monthsMap[pid] = new Set()
-    profitMap[pid] += tx.type === 'income' ? Number(tx.net_amount) : -Number(tx.net_amount)
-    if (tx.billing_month) monthsMap[pid].add(tx.billing_month.split('T')[0])
+  const profitMap: Record<string, number>  = {}
+  const monthsMap: Record<string, number>  = {}
+  for (const r of profitSummary ?? []) {
+    profitMap[r.property_id] = Number(r.total_profit)
+    monthsMap[r.property_id] = r.months_count
   }
 
   const formatBRL = (val: number | null | undefined) =>
@@ -128,7 +109,7 @@ export default async function ImoveisPage() {
               const yield_        = purchaseValue && currentRent ? (currentRent * 12) / purchaseValue * 100 : null
               const totalProfit   = profitMap[prop.id] || 0
               const roiAcum       = purchaseValue && totalProfit !== 0 ? (totalProfit / purchaseValue) * 100 : null
-              const mesesComDados = monthsMap[prop.id]?.size ?? 0
+              const mesesComDados = monthsMap[prop.id] ?? 0
               const roiAnualizado = purchaseValue && mesesComDados >= 3 ? (totalProfit / mesesComDados * 12) / purchaseValue * 100 : null
               const addr          = addressLine(prop)
 

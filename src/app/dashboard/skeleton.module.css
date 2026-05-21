@@ -1,0 +1,130 @@
+/* Shared skeleton / shimmer for all dashboard loading states */
+
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+.bone {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+/* ── header ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 40px;
+}
+.headerTitle { width: 280px; height: 36px; }
+.headerSub   { width: 340px; height: 18px; margin-top: 10px; }
+.headerBtn   { width: 72px;  height: 40px; border-radius: 12px; }
+
+/* ── section label ── */
+.sectionLabel {
+  width: 180px;
+  height: 14px;
+  margin-bottom: 16px;
+}
+
+/* ── card grid ── */
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+.grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cardLabel { width: 120px; height: 13px; }
+.cardIcon  { width: 40px;  height: 40px; border-radius: 8px; }
+.cardValue { width: 140px; height: 32px; }
+.cardSub   { width: 180px; height: 12px; }
+
+/* ── table ── */
+.tableWrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+.tableHead {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+.tableHeadCell { height: 13px; border-radius: 4px; }
+.tableRow {
+  display: flex;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  align-items: center;
+}
+.tableRow:last-child { border-bottom: none; }
+.tableCell { height: 14px; border-radius: 4px; }
+
+/* ── filters bar ── */
+.filtersBar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.filterChip {
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* ── alert strip ── */
+.alertStrip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.alertRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.alertLeft  { width: 220px; height: 16px; }
+.alertRight { width: 110px; height: 26px; border-radius: 8px; }

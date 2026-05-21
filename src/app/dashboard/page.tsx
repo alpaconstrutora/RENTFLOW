@@ -11,119 +11,94 @@ export default async function Dashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })
-  const today = (todayStr as string | null) ?? new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
+  // Compute today in BR timezone locally — no extra round-trip needed
+  const today = new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
   const [yr, mo] = today.split('-').map(Number)
   const startOfMonth = `${yr}-${String(mo).padStart(2, '0')}-01`
-  const startOfYear = `${yr}-01-01`
+  const startOfYear  = `${yr}-01-01`
 
-  // D+7 e D+30 para alertas
   const todayDate = new Date(today + 'T00:00:00Z')
-  const day7Date = new Date(todayDate); day7Date.setUTCDate(todayDate.getUTCDate() + 7)
-  const day30Date = new Date(todayDate); day30Date.setUTCDate(todayDate.getUTCDate() + 30)
-  const day30Str = day30Date.toISOString().split('T')[0]
-  const day7Str = day7Date.toISOString().split('T')[0]
-  const day30Ago = new Date(todayDate); day30Ago.setUTCDate(todayDate.getUTCDate() - 30)
-  const day30AgoStr = day30Ago.toISOString().split('T')[0]
+  const addDays = (d: Date, n: number) => { const r = new Date(d); r.setUTCDate(d.getUTCDate() + n); return r.toISOString().split('T')[0] }
+  const day7Str    = addDays(todayDate,   7)
+  const day30Str   = addDays(todayDate,  30)
+  const day30AgoStr= addDays(todayDate, -30)
+  const d365AgoStr = addDays(todayDate,-365)
 
-  // ── KPI 1: DRE — Lucro Real do mês e YTD
-  const [{ data: incomes }, { data: expenses }, { data: incomesYtd }, { data: expensesYtd }] = await Promise.all([
-    supabase.from('transactions_view').select('net_amount').eq('type', 'income').eq('status', 'paid').gte('billing_month', startOfMonth),
-    supabase.from('transactions_view').select('net_amount').eq('type', 'expense').eq('status', 'paid').gte('billing_month', startOfMonth),
-    supabase.from('transactions_view').select('net_amount').eq('type', 'income').eq('status', 'paid').gte('billing_month', startOfYear),
-    supabase.from('transactions_view').select('net_amount').eq('type', 'expense').eq('status', 'paid').gte('billing_month', startOfYear),
+  // All 11 queries in one parallel round-trip
+  const [
+    { data: incomes },
+    { data: expenses },
+    { data: incomesYtd },
+    { data: expensesYtd },
+    { data: lateInc },
+    { data: expectedInc },
+    { data: lateRolling },
+    { data: expRolling },
+    { data: paidHist },
+    { count: totalProps },
+    { count: rentedProps },
+    { data: vencD7 },
+    { data: expiringLeasesRaw },
+    { data: allProps },
+    { data: leaseAlerts },
+    { data: billingStatus },
+  ] = await Promise.all([
+    supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfYear),
+    supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfYear),
+    supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('due_date', day30AgoStr).lte('due_date', today),
+    supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('due_date', day30AgoStr).lte('due_date', today),
+    supabase.from('transactions_view').select('paid_date, due_date').eq('type','income').eq('status','paid').not('paid_date','is',null).gte('paid_date', d365AgoStr),
+    supabase.from('properties').select('*', { count: 'exact', head: true }),
+    supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status','rented'),
+    supabase.from('transactions_view').select('id, amount, due_date, type, property_id').in('status',['pending','late']).gte('due_date', today).lte('due_date', day7Str).order('due_date'),
+    supabase.from('leases').select('id, end_date, rent_value, property:properties(name)').eq('active',true).not('end_date','is',null).gte('end_date', today).lte('end_date', day30Str).order('end_date'),
+    supabase.from('properties').select('id, name, purchase_value, leases!inner(rent_value, active)').gt('purchase_value',0).eq('leases.active',true),
+    supabase.rpc('get_lease_alerts', { p_user_id: user.id }),
+    supabase.rpc('get_last_billing_status'),
   ])
-  const totalIncome = incomes?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
+
+  // ── KPI 1
+  const totalIncome  = incomes?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
   const totalExpense = expenses?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
-  const netProfit = totalIncome - totalExpense
+  const netProfit    = totalIncome - totalExpense
 
-  const totalIncomeYtd = incomesYtd?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
+  const totalIncomeYtd  = incomesYtd?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
   const totalExpenseYtd = expensesYtd?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
-  const netProfitYtd = totalIncomeYtd - totalExpenseYtd
+  const netProfitYtd    = totalIncomeYtd - totalExpenseYtd
 
-  // ── KPI 2: Inadimplência — Taxa % sobre total esperado no mês (I3)
-  const [{ data: lateInc }, { data: expectedInc }] = await Promise.all([
-    supabase.from('transactions_view').select('amount').eq('type', 'income').eq('status', 'late').gte('billing_month', startOfMonth),
-    supabase.from('transactions_view').select('amount').eq('type', 'income').in('status', ['pending', 'paid', 'late']).gte('billing_month', startOfMonth),
-  ])
-  const totalLate = lateInc?.reduce((s, t) => s + Number(t.amount), 0) || 0
+  // ── KPI 2
+  const totalLate     = lateInc?.reduce((s, t) => s + Number(t.amount), 0) || 0
   const totalExpected = expectedInc?.reduce((s, t) => s + Number(t.amount), 0) || 0
   const inadimplenciaPct = totalExpected > 0 ? ((totalLate / totalExpected) * 100).toFixed(1) : '0.0'
 
-  // ── KPI 3: Rolling 30d inadimplência (I3)
-  const [{ data: lateRolling }, { data: expRolling }] = await Promise.all([
-    supabase.from('transactions_view').select('amount').eq('type', 'income').eq('status', 'late').gte('due_date', day30AgoStr).lte('due_date', today),
-    supabase.from('transactions_view').select('amount').eq('type', 'income').in('status', ['pending','paid','late']).gte('due_date', day30AgoStr).lte('due_date', today),
-  ])
+  // ── KPI 3
   const lateR = lateRolling?.reduce((s, t) => s + Number(t.amount), 0) || 0
-  const expR = expRolling?.reduce((s, t) => s + Number(t.amount), 0) || 0
+  const expR  = expRolling?.reduce((s, t) => s + Number(t.amount), 0) || 0
   const rolling30Pct = expR > 0 ? ((lateR / expR) * 100).toFixed(1) : '0.0'
 
-  // ── TMR (Tempo Médio de Recebimento)
-  const d365Ago = new Date(todayDate)
-  d365Ago.setUTCDate(todayDate.getUTCDate() - 365)
-  const d365AgoStr = d365Ago.toISOString().split('T')[0]
-  const { data: paidHist } = await supabase
-    .from('transactions_view')
-    .select('paid_date, due_date')
-    .eq('type', 'income')
-    .eq('status', 'paid')
-    .not('paid_date', 'is', null)
-    .gte('paid_date', d365AgoStr)
-  
-  let tmrDaysTotal = 0
-  let tmrCount = 0
+  // ── TMR
+  let tmrDaysTotal = 0, tmrCount = 0
   for (const t of paidHist || []) {
-    const pDate = new Date(t.paid_date + 'T12:00:00Z')
-    const dDate = new Date(t.due_date + 'T12:00:00Z')
-    const diffTime = pDate.getTime() - dDate.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    // we only care about positive or slightly negative, mostly positive late days
-    // to strictly be atraso we could filter diffDays > 0, but as an average we can use all
-    tmrDaysTotal += diffDays > 0 ? diffDays : 0
-    tmrCount++
+    const diff = Math.ceil((new Date(t.paid_date + 'T12:00:00Z').getTime() - new Date(t.due_date + 'T12:00:00Z').getTime()) / 86400000)
+    if (diff > 0) { tmrDaysTotal += diff; tmrCount++ }
   }
   const tmrAvg = tmrCount > 0 ? (tmrDaysTotal / tmrCount).toFixed(1) : '0.0'
 
-  // ── KPI 4: Ocupação
-  const [{ count: totalProps }, { count: rentedProps }] = await Promise.all([
-    supabase.from('properties').select('*', { count: 'exact', head: true }),
-    supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'rented'),
-  ])
+  // ── KPI 4
   const vacancyRate = totalProps && totalProps > 0 ? (((totalProps - (rentedProps || 0)) / totalProps) * 100).toFixed(1) : '0.0'
 
-  // ── I3: Vencimentos D-7 (próximos 7 dias)
-  const { data: vencD7 } = await supabase
-    .from('transactions_view')
-    .select('id, amount, due_date, type, property_id')
-    .in('status', ['pending', 'late'])
-    .gte('due_date', today)
-    .lte('due_date', day7Str)
-    .order('due_date')
-
-  // ── I3: Contratos expirando em 30 dias
-  const { data: expiringLeasesRaw } = await supabase
-    .from('leases')
-    .select('id, end_date, rent_value, property:properties(name)')
-    .eq('active', true)
-    .not('end_date', 'is', null)
-    .gte('end_date', today)
-    .lte('end_date', day30Str)
-    .order('end_date')
+  // ── I3 types
   const expiringLeases = expiringLeasesRaw as { id: string; end_date: string; rent_value: number; property: { name: string } | null }[] | null
 
-  // ── I3: Top 3 Yield (Invariante #12: proteção contra purchase_value=0/NULL)
-  const { data: allProps } = await supabase
-    .from('properties')
-    .select('id, name, purchase_value, leases!inner(rent_value, active)')
-    .gt('purchase_value', 0)
-    .eq('leases.active', true)
-
+  // ── Top 3 Yield
   const top3Yield = (allProps || [])
     .map((p) => {
       const leases = p.leases as { rent_value: number; active: boolean }[]
-      const activeLeases = leases?.filter((l) => l.active) || []
-      const rent = activeLeases[0]?.rent_value ?? 0
+      const rent = leases?.filter(l => l.active)[0]?.rent_value ?? 0
       const pv = p.purchase_value as number
       const yld = pv > 0 ? (rent * 12 / pv * 100) : null
       return { name: p.name as string, yield: yld }
@@ -131,12 +106,6 @@ export default async function Dashboard() {
     .filter(p => p.yield !== null)
     .sort((a, b) => (b.yield ?? 0) - (a.yield ?? 0))
     .slice(0, 3)
-
-  // ── Alertas de Contratos (vencimento + reajuste)
-  const [{ data: leaseAlerts }, { data: billingStatus }] = await Promise.all([
-    supabase.rpc('get_lease_alerts', { p_user_id: user.id }),
-    supabase.rpc('get_last_billing_status'),
-  ])
   const lastBilling = (billingStatus as { status: string; error_message: string | null; rows_affected: number | null; run_at: string }[] | null)?.[0] ?? null
   const leaseAlertsData = (leaseAlerts as {
     lease_id: string; property_name: string; tenant_name: string;

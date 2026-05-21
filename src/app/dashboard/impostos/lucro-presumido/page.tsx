@@ -5,10 +5,11 @@ import { ArrowLeft } from 'lucide-react'
 import YearFilter from '../YearFilter'
 import PjTaxConfigForm from './PjTaxConfigForm'
 import QuarterParcelamento from './QuarterParcelamento'
+import LaunchPjTaxesBtn from './LaunchPjTaxesBtn'
 import { vencimentoPisCofins, vencimentoTrimestral, quarterOfMonth, formatBR, type Quarter } from '../../../../lib/fiscal/calendar'
 import {
   PIS_RATE_DEFAULT, COFINS_RATE_DEFAULT, CSLL_RATE_DEFAULT, IRPJ_RATE_DEFAULT,
-  PRESUMED_BASE_FACTOR_DEFAULT,
+  PRESUMED_BASE_FACTOR_DEFAULT, IRPJ_ADICIONAL_RATE, IRPJ_ADICIONAL_THRESHOLD_QUARTER,
 } from '../../../../lib/fiscal/rules'
 import FiscalDisclaimer from '../FiscalDisclaimer'
 import { getSelicAnual, anualParaMensal, formatSelicAnual } from '../../../../lib/fiscal/selic'
@@ -73,7 +74,10 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
   })
 
   // Agrupa por trimestre para CSLL/IRPJ
-  type QuarterRow = { quarter: Quarter; year: number; months: string[]; bruto: number; csll: number; irpj: number; total: number; due: string }
+  type QuarterRow = {
+    quarter: Quarter; year: number; months: string[]
+    bruto: number; csll: number; irpj: number; irpjAdicional: number; total: number; due: string
+  }
   const quarterMap: Record<string, QuarterRow> = {}
   for (const bm of months) {
     const [y2, m2] = bm.split('-').map(Number)
@@ -82,7 +86,7 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
     if (!quarterMap[key]) {
       quarterMap[key] = {
         quarter: q, year: y2, months: [],
-        bruto: 0, csll: 0, irpj: 0, total: 0,
+        bruto: 0, csll: 0, irpj: 0, irpjAdicional: 0, total: 0,
         due: formatBR(vencimentoTrimestral(y2, q)),
       }
     }
@@ -91,8 +95,15 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
     quarterMap[key].bruto += v
     quarterMap[key].csll  += v * csllRate
     quarterMap[key].irpj  += v * irpjRate
-    quarterMap[key].total += v * (csllRate + irpjRate)
   }
+
+  // IRPJ Adicional — Lei 9.430/96, art. 3º: 10% sobre base presumida trimestral > R$60.000
+  for (const row of Object.values(quarterMap)) {
+    const basePresumida = row.bruto * base
+    row.irpjAdicional = Math.max(0, basePresumida - IRPJ_ADICIONAL_THRESHOLD_QUARTER) * IRPJ_ADICIONAL_RATE
+    row.total = row.csll + row.irpj + row.irpjAdicional
+  }
+
   const quarterRows = Object.values(quarterMap)
     .sort((a, b) => `${a.year}-${a.quarter}`.localeCompare(`${b.year}-${b.quarter}`))
     .map(r => ({
@@ -101,12 +112,13 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
       parcelamento3: calcParcelamento(r.total, r.year, r.quarter, 3, selicMensal, selicAnual),
     }))
 
-  const totalBruto = months.reduce((s, bm) => s + byMonth[bm], 0)
-  const pisTax     = totalBruto * pisRate
-  const cofinsTax  = totalBruto * cofinsRate
-  const csllFinal  = totalBruto * csllRate
-  const irpjFinal  = totalBruto * irpjRate
-  const totalTax   = pisTax + cofinsTax + csllFinal + irpjFinal
+  const totalBruto      = months.reduce((s, bm) => s + byMonth[bm], 0)
+  const pisTax          = totalBruto * pisRate
+  const cofinsTax       = totalBruto * cofinsRate
+  const csllFinal       = totalBruto * csllRate
+  const irpjFinal       = totalBruto * irpjRate
+  const irpjAdicionalTotal = quarterRows.reduce((s, r) => s + r.irpjAdicional, 0)
+  const totalTax        = pisTax + cofinsTax + csllFinal + irpjFinal + irpjAdicionalTotal
 
   const fmt    = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
   const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`
@@ -115,7 +127,7 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
     { label: 'PIS',    color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(244,114,182,0.2)', value: pisTax,    rate: pisRate,    desc: 'receita bruta' },
     { label: 'COFINS', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)', value: cofinsTax, rate: cofinsRate, desc: 'receita bruta' },
     { label: 'CSLL',   color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.2)',  value: csllFinal, rate: csllRate,   desc: `equiv. 9%×${fmtPct(base)}` },
-    { label: 'IRPJ',   color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  border: 'rgba(251,146,60,0.2)',  value: irpjFinal, rate: irpjRate,   desc: `equiv. 15%×${fmtPct(base)}` },
+    { label: 'IRPJ',   color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  border: 'rgba(251,146,60,0.2)',  value: irpjFinal + irpjAdicionalTotal, rate: irpjRate, desc: `15%×${fmtPct(base)}${irpjAdicionalTotal > 0 ? ' + adicional 10%' : ''}` },
   ]
 
   return (
@@ -131,7 +143,10 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
           <h1 className={styles.title}>Lucro Presumido — PJ</h1>
           <p className={styles.subtitle}>Estimativa de PIS, COFINS, CSLL e IRPJ sobre receitas de aluguel.</p>
         </div>
-        <YearFilter selectedYear={parseInt(yr)} currentYear={currentYear} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {totalBruto > 0 && <LaunchPjTaxesBtn year={parseInt(yr)} />}
+          <YearFilter selectedYear={parseInt(yr)} currentYear={currentYear} />
+        </div>
       </header>
 
       <FiscalDisclaimer
@@ -255,14 +270,13 @@ export default async function LucroPresumidoPage({ searchParams }: { searchParam
                       bruto={r.bruto}
                       csll={r.csll}
                       irpj={r.irpj}
+                      irpjAdicional={r.irpjAdicional}
                       total={r.total}
                       due={r.due}
                       months={r.months}
                       parcelamento2={r.parcelamento2}
                       parcelamento3={r.parcelamento3}
                       selicAnual={selicAnual}
-                      fmt={fmt}
-                      fmtPct={fmtPct}
                     />
                   ))}
                 </tbody>

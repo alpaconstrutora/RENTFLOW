@@ -37,34 +37,16 @@ export default async function InquilinosPage() {
 
   const { data: tenantsRaw } = await supabase
     .from('tenants')
-    .select('id, name, email, phone, document')
+    .select(`
+      id, name, email, phone, document,
+      type, birth_date, marital_status, profession, rg, nationality, monthly_income,
+      zip_code, street, street_number, district, city, state, address_complement,
+      photo_url, guarantor_name, guarantor_document, notes
+    `)
     .eq('user_id', user?.id ?? '')
     .order('created_at', { ascending: false })
 
-  // Sprint 1 columns — migration 20260425000000
-  const { data: ext1Raw } = await supabase
-    .from('tenants')
-    .select('id, type, birth_date, marital_status, profession, rg, nationality, monthly_income, zip_code, street, street_number, district, city, state, address_complement')
-    .eq('user_id', user?.id ?? '')
-
-  // Sprint 2 columns — migration 20260425000001
-  const { data: ext2Raw } = await supabase
-    .from('tenants')
-    .select('id, photo_url, guarantor_name, guarantor_document')
-    .eq('user_id', user?.id ?? '')
-
-  // Sprint 3 columns — migration 20260425000002
-  const { data: ext3Raw } = await supabase
-    .from('tenants')
-    .select('id, notes')
-    .eq('user_id', user?.id ?? '')
-
-  const extMap: Record<string, Partial<TenantRow>> = {}
-  for (const r of ext1Raw ?? []) extMap[r.id] = { ...extMap[r.id], ...r }
-  for (const r of ext2Raw ?? []) extMap[r.id] = { ...extMap[r.id], ...r }
-  for (const r of ext3Raw ?? []) extMap[r.id] = { ...extMap[r.id], ...r }
-
-  const tenants = (tenantsRaw ?? []).map(t => ({ ...t, ...extMap[t.id] })) as TenantRow[]
+  const tenants = (tenantsRaw ?? []) as TenantRow[]
 
   function addressLine(t: TenantRow): string | null {
     if (t.street) {

@@ -14,18 +14,22 @@ export async function GET(
 
   const { data: lease } = await supabase
     .from('leases')
-    .select('id, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id')
+    .select('id, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
     .eq('id', leaseId)
     .single()
 
   if (!lease) return new Response('Contrato não encontrado', { status: 404 })
 
-  const [{ data: propertyRaw }, { data: tenantRaw }] = await Promise.all([
-    supabase.from('properties').select('name, address, city, state').eq('id', lease.property_id).single(),
-    supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state').eq('id', lease.tenant_id).single(),
+  const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
+    supabase.from('properties').select('name, address, city, state, type').eq('id', lease.property_id).single(),
+    supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', lease.tenant_id).single(),
+    lease.landlord_profile_id
+      ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', lease.landlord_profile_id).single()
+      : supabase.from('landlord_profiles').select('name, document, phone, address').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
   ])
 
   const meta = user.user_metadata as { name?: string; phone?: string; document?: string; address?: string }
+  const ownerProfile = landlordProfileRaw as { name: string; document: string | null; phone: string | null; address: string | null } | null
 
   const pdfData = buildContratoPdfData({
     leaseId,
@@ -33,10 +37,10 @@ export async function GET(
     property: propertyRaw as Parameters<typeof buildContratoPdfData>[0]['property'],
     tenant: tenantRaw as Parameters<typeof buildContratoPdfData>[0]['tenant'],
     owner: {
-      name:     meta.name     ?? user.email ?? '—',
-      document: meta.document ?? null,
-      phone:    meta.phone    ?? null,
-      address:  meta.address  ?? null,
+      name:     ownerProfile?.name     ?? meta.name     ?? user.email ?? '—',
+      document: ownerProfile?.document ?? meta.document ?? null,
+      phone:    ownerProfile?.phone    ?? meta.phone    ?? null,
+      address:  ownerProfile?.address  ?? meta.address  ?? null,
     },
   })
 

@@ -97,23 +97,14 @@ export async function updateTransactionWithOptimisticLock(id: string, newStatus:
 
   if (rpcError) throw new Error(rpcError.message)
 
-  // domain_event payment_received (source='user')
   if (newStatus === 'paid' && txOrig?.status !== 'paid') {
-    await supabase.from('domain_events').insert({
-      user_id: user.id,
-      event_type: 'payment_received',
-      event_version: 1,
-      source: 'user',
-      payload: {
+    await supabase.rpc('log_domain_event', {
+      p_event_type: 'payment_received',
+      p_payload: {
         entity_id: id,
         entity_type: 'transaction',
         timestamp: new Date().toISOString(),
-        context: {
-          transaction_id: id,
-          amount: txOrig?.amount,
-          paid_date: paidDate,
-          property_id: txOrig?.property_id
-        }
+        context: { transaction_id: id, amount: txOrig?.amount, paid_date: paidDate, property_id: txOrig?.property_id }
       }
     })
   }
@@ -175,13 +166,9 @@ export async function createAdjustmentTransaction(
 
   if (error) throw new Error(error.message)
 
-  // domain_event
-  await supabase.from('domain_events').insert({
-    user_id: user.id,
-    event_type: 'payment_received',
-    event_version: 1,
-    source: 'user',
-    payload: {
+  await supabase.rpc('log_domain_event', {
+    p_event_type: 'payment_received',
+    p_payload: {
       entity_id: parentId,
       entity_type: 'transaction',
       timestamp: new Date().toISOString(),

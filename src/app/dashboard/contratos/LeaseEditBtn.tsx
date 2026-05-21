@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit, X, TrendingUp, CalendarClock, FileText, Download } from 'lucide-react'
-import { updateLeaseAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction } from './actions'
+import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw } from 'lucide-react'
+import { updateLeaseAction, renewLeaseAction, getAdjustmentIndexAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction } from './actions'
 
 interface Props {
   lease: {
     id: string
     rent_value: number
     due_day: number
+    start_date?: string | null
     end_date?: string | null
     billing_start_date?: string | null
     adjustment_period_months?: number | null
@@ -17,13 +18,14 @@ interface Props {
     iptu_paid_by?: string | null
     condo_paid_by?: string | null
     landlord_profile_id?: string | null
+    guarantee_type?: string | null
   }
   landlordProfiles?: { id: string, name: string, person_type: string, document: string | null, is_default: boolean }[]
 }
 
 export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
   const [isOpen, setIsOpen] = useState(false)
-  const [tab, setTab] = useState<'reajuste' | 'clausula' | 'documentos'>('reajuste')
+  const [tab, setTab] = useState<'reajuste' | 'clausula' | 'renovacao' | 'documentos'>('reajuste')
   const [errorMsg, setErrorMsg] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [newValue, setNewValue] = useState(lease.rent_value)
@@ -31,6 +33,9 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
   const [docs, setDocs] = useState<{ id: string; version: number; label: string | null; created_at: string; storage_path: string }[]>([])
   const [docsLoading, setDocsLoading] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [indiceData, setIndiceData] = useState<{ pct: number; ref: string; source: string } | null>(null)
+  const [indiceLoading, setIndiceLoading] = useState(false)
+  const [indiceError, setIndiceError] = useState('')
 
   useEffect(() => {
     if (tab === 'documentos' && isOpen) {
@@ -56,6 +61,22 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
     if (!isNaN(n)) setNewValue(parseFloat((lease.rent_value * (1 + n / 100)).toFixed(2)))
   }
 
+  async function fetchIndice() {
+    const idx = lease.adjustment_index ?? 'IGPM'
+    if (idx !== 'IGPM' && idx !== 'IPCA') return
+    setIndiceLoading(true)
+    setIndiceError('')
+    setIndiceData(null)
+    const result = await getAdjustmentIndexAction(idx, lease.adjustment_period_months ?? 12)
+    setIndiceLoading(false)
+    if (!result || result.source === 'fallback') {
+      setIndiceError('Índice indisponível no momento. Informe manualmente.')
+      return
+    }
+    setIndiceData(result)
+    applyPct(result.pct.toFixed(2))
+  }
+
   function onNewValueChange(v: number) {
     setNewValue(v)
     if (lease.rent_value > 0) setPct(((v / lease.rent_value - 1) * 100).toFixed(2))
@@ -64,7 +85,9 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
   const handleSubmit = async (formData: FormData) => {
     setIsLoading(true)
     setErrorMsg('')
-    const error = await updateLeaseAction(formData)
+    const error = tab === 'renovacao'
+      ? await renewLeaseAction(formData)
+      : await updateLeaseAction(formData)
     setIsLoading(false)
     if (error) { setErrorMsg(error) } else { setIsOpen(false) }
   }
@@ -116,6 +139,10 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                 <CalendarClock size={12} style={{ marginRight: '4px', display: 'inline' }} />
                 Cláusula Contratual
               </button>
+              <button type="button" style={tabStyle(tab === 'renovacao')} onClick={() => setTab('renovacao')}>
+                <RotateCcw size={12} style={{ marginRight: '4px', display: 'inline' }} />
+                Renovar
+              </button>
               <button type="button" style={tabStyle(tab === 'documentos')} onClick={() => setTab('documentos')}>
                 <FileText size={12} style={{ marginRight: '4px', display: 'inline' }} />
                 Documentos
@@ -158,6 +185,30 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                       />
                     </div>
                   </div>
+
+                  {/* Buscar índice do BACEN automaticamente */}
+                  {(lease.adjustment_index === 'IGPM' || lease.adjustment_index === 'IPCA') && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={fetchIndice}
+                        disabled={indiceLoading}
+                        style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.08)', color: 'var(--accent-color)', cursor: 'pointer', opacity: indiceLoading ? 0.6 : 1 }}
+                      >
+                        {indiceLoading ? 'Buscando...' : `Buscar ${lease.adjustment_index} atual (BACEN)`}
+                      </button>
+                      {indiceData && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {lease.adjustment_index} {indiceData.ref}:{' '}
+                          <strong style={{ color: 'white' }}>{indiceData.pct.toFixed(2)}%</strong>
+                          {' '}· BACEN
+                        </span>
+                      )}
+                      {indiceError && (
+                        <span style={{ fontSize: '11px', color: 'var(--warning-color)' }}>{indiceError}</span>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Dia do Vencto. <span style={{ color: 'var(--danger-color)' }}>*</span></label>
@@ -259,6 +310,21 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                     </div>
                   </div>
 
+                  {/* Tipo de Garantia */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Tipo de Garantia</label>
+                    <select name="guarantee_type" defaultValue={lease.guarantee_type ?? 'nenhuma'} style={inputStyle}>
+                      <option value="nenhuma">Sem garantia</option>
+                      <option value="fiador">Fiador</option>
+                      <option value="caucao">Caução</option>
+                      <option value="seguro_fianca">Seguro Fiança</option>
+                      <option value="titulo_capitalizacao">Título de Capitalização</option>
+                    </select>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Se "Fiador", os dados são gerenciados no cadastro do inquilino.
+                    </span>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Periodicidade do Reajuste</label>
@@ -278,6 +344,35 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                         <option value="LIVRE">Livre Acordo</option>
                       </select>
                     </div>
+                  </div>
+                </>
+              )}
+
+              {/* Aba: Renovação */}
+              {tab === 'renovacao' && (
+                <>
+                  <input type="hidden" name="rent_value" value={lease.rent_value} />
+                  <input type="hidden" name="due_day" value={lease.due_day} />
+
+                  <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    <strong style={{ color: 'white' }}>Vigência atual:</strong>{' '}
+                    {formatDate(lease.start_date)} — {formatDate(lease.end_date) || 'Indeterminado'}
+                    <br />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      A renovação estende o término sem criar um novo contrato. O ciclo de reajuste e o histórico de parcelas são mantidos.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Novo Término <span style={{ color: 'var(--danger-color)' }}>*</span>
+                    </label>
+                    <input
+                      name="new_end_date"
+                      type="date"
+                      required
+                      style={{ ...inputStyle, colorScheme: 'dark' }}
+                    />
                   </div>
                 </>
               )}
@@ -332,7 +427,7 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                     Cancelar
                   </button>
                   <button type="submit" disabled={isLoading} style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: isLoading ? 0.7 : 1 }}>
-                    {isLoading ? 'Salvando...' : (tab === 'reajuste' ? 'Aplicar Reajuste' : 'Salvar Cláusula')}
+                    {isLoading ? 'Salvando...' : tab === 'reajuste' ? 'Aplicar Reajuste' : tab === 'renovacao' ? 'Renovar Contrato' : 'Salvar Cláusula'}
                   </button>
                 </div>
               )}

@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateContratoPdfBuffer, buildContratoPdfData } from '../../../lib/pdf/generateContratoPdfBuffer'
 import { formatBRL } from '../../../lib/valorPorExtenso'
+import { getAdjustmentIndex } from '../../../lib/fiscal/indices'
+import { getResend, FROM_EMAIL } from '../../../lib/email/client'
 
 async function saveLeaseSnapshot(
   supabase: SupabaseClient,
@@ -14,19 +16,29 @@ async function saveLeaseSnapshot(
 ) {
   try {
     const [{ data: leaseFullRaw }, { data: propertyRaw }, userRes] = await Promise.all([
-      supabase.from('leases').select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id').eq('id', leaseId).single(),
-      supabase.from('leases').select('properties(name, address, city, state)').eq('id', leaseId).single(),
+      supabase.from('leases').select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by').eq('id', leaseId).single(),
+      supabase.from('leases').select('properties(name, address, city, state, type)').eq('id', leaseId).single(),
       supabase.auth.getUser(),
     ])
     if (!leaseFullRaw) return
 
-    const lease = { rent_value: leaseFullRaw.rent_value, due_day: leaseFullRaw.due_day, start_date: leaseFullRaw.start_date, end_date: leaseFullRaw.end_date, adjustment_index: leaseFullRaw.adjustment_index, adjustment_period_months: leaseFullRaw.adjustment_period_months }
+    const lease = {
+      rent_value: leaseFullRaw.rent_value,
+      due_day: leaseFullRaw.due_day,
+      start_date: leaseFullRaw.start_date,
+      end_date: leaseFullRaw.end_date,
+      adjustment_index: leaseFullRaw.adjustment_index,
+      adjustment_period_months: leaseFullRaw.adjustment_period_months,
+      guarantee_type: leaseFullRaw.guarantee_type,
+      iptu_paid_by: leaseFullRaw.iptu_paid_by,
+      condo_paid_by: leaseFullRaw.condo_paid_by,
+    }
 
     const [{ data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
-      supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state').eq('id', leaseFullRaw.tenant_id).single(),
+      supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', leaseFullRaw.tenant_id).single(),
       leaseFullRaw.landlord_profile_id
         ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', leaseFullRaw.landlord_profile_id).single()
-        : supabase.from('landlord_profiles').select('name, document, phone, address').eq('is_default', true).maybeSingle(),
+        : supabase.from('landlord_profiles').select('name, document, phone, address').eq('user_id', userId).eq('is_default', true).maybeSingle(),
     ])
 
     const property = (propertyRaw as { properties: unknown })?.properties as Parameters<typeof buildContratoPdfData>[0]['property']
@@ -118,6 +130,7 @@ export async function createLeaseAction(formData: FormData) {
     const iptuPaidBy         = (formData.get('iptu_paid_by')          as string) || 'tenant'
     const condoPaidBy        = (formData.get('condo_paid_by')         as string) || 'tenant'
     const landlordProfileId  = (formData.get('landlord_profile_id')   as string) || null
+    const guaranteeType      = (formData.get('guarantee_type')         as string) || 'nenhuma'
 
     if (!propertyId || !tenantId || !startDate) {
       return "Campos obrigatórios ausentes."
@@ -139,6 +152,7 @@ export async function createLeaseAction(formData: FormData) {
       iptu_paid_by:        iptuPaidBy,
       condo_paid_by:       condoPaidBy,
       landlord_profile_id: landlordProfileId || null,
+      guarantee_type:      guaranteeType,
       active: true
     }).select('id').single()
 
@@ -173,12 +187,9 @@ export async function createLeaseAction(formData: FormData) {
     const startDateObj = new Date(effectiveBillingStart + 'T00:00:00Z')
     
     // I10: domain_event contract_created — SEMPRE emitido, mesmo em retroativo
-    await supabase.from('domain_events').insert({
-      user_id: user.id,
-      event_type: 'contract_created',
-      event_version: 1,
-      source: 'user',
-      payload: {
+    await supabase.rpc('log_domain_event', {
+      p_event_type: 'contract_created',
+      p_payload: {
         entity_id: insertedLease.id,
         entity_type: 'lease',
         timestamp: new Date().toISOString(),
@@ -217,28 +228,20 @@ export async function runBackfillAction(leaseId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return "Erro de Autenticação."
 
-    console.log('[runBackfillAction] starting for lease:', leaseId)
-    const { data: count, error } = await supabase.rpc('backfill_lease_history', { p_lease_id: leaseId })
+    console.log('[runBackfillAction] starting for lease:', leaseId, 'user:', user.id)
+    const { data: count, error } = await supabase.rpc('backfill_lease_history', { p_lease_id: leaseId, p_user_id: user.id })
     console.log('[runBackfillAction] rpc result:', count, error)
     if (error) return error.message
 
-    // PENDENTE D3: domain_event backfill_generated (source='user')
-    const { error: eventError } = await supabase.from('domain_events').insert({
-      user_id: user.id,
-      event_type: 'backfill_generated',
-      event_version: 1,
-      source: 'user',
-      payload: {
+    const { error: eventError } = await supabase.rpc('log_domain_event', {
+      p_event_type: 'backfill_generated',
+      p_payload: {
         entity_id: leaseId,
         entity_type: 'lease',
         timestamp: new Date().toISOString(),
-        context: {
-          lease_id: leaseId,
-          months_count: count ?? 0
-        }
+        context: { lease_id: leaseId, months_count: count ?? 0 }
       }
     })
-    console.log('[runBackfillAction] domain_event result:', eventError)
     if (eventError) return eventError.message
 
     revalidatePath('/dashboard/contratos')
@@ -269,6 +272,7 @@ export async function updateLeaseAction(formData: FormData) {
     const iptuPaidBy        = formData.has('iptu_paid_by')         ? (formData.get('iptu_paid_by')         as string) : undefined
     const condoPaidBy       = formData.has('condo_paid_by')        ? (formData.get('condo_paid_by')        as string) : undefined
     const landlordProfileId = formData.has('landlord_profile_id')  ? ((formData.get('landlord_profile_id') as string) || null) : undefined
+    const guaranteeType     = formData.has('guarantee_type')       ? (formData.get('guarantee_type')       as string) : undefined
 
     if (isNaN(newRentValue) || newRentValue <= 0) return "Valor do aluguel deve ser positivo."
 
@@ -286,6 +290,7 @@ export async function updateLeaseAction(formData: FormData) {
     if (iptuPaidBy        !== undefined) updatePayload.iptu_paid_by        = iptuPaidBy
     if (condoPaidBy       !== undefined) updatePayload.condo_paid_by       = condoPaidBy
     if (landlordProfileId !== undefined) updatePayload.landlord_profile_id = landlordProfileId
+    if (guaranteeType     !== undefined) updatePayload.guarantee_type      = guaranteeType
 
     const { error } = await supabase.from('leases')
       .update(updatePayload)
@@ -442,12 +447,58 @@ export async function getLeaseDocumentsAction(leaseId: string) {
   return data ?? []
 }
 
+export async function getAdjustmentIndexAction(
+  adjustmentIndex: string,
+  periodMonths: number
+) {
+  if (adjustmentIndex !== 'IGPM' && adjustmentIndex !== 'IPCA') return null
+  return getAdjustmentIndex(adjustmentIndex, periodMonths)
+}
+
 export async function getLeaseDocumentUrlAction(storagePath: string) {
   const supabase = await createClient()
   const { data } = await supabase.storage
     .from('lease-documents')
     .createSignedUrl(storagePath, 300) // 5 min
   return data?.signedUrl ?? null
+}
+
+export async function renewLeaseAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return "Erro de Autenticação."
+
+    const id = formData.get('id') as string
+    const newEndDate = formData.get('new_end_date') as string
+    if (!newEndDate) return "Nova data de término obrigatória."
+
+    const { error } = await supabase.from('leases')
+      .update({ end_date: newEndDate, active: true })
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (error) return error.message
+
+    await Promise.all([
+      supabase.rpc('log_domain_event', {
+        p_event_type: 'contract_renewed',
+        p_payload: {
+          entity_id: id,
+          entity_type: 'lease',
+          timestamp: new Date().toISOString(),
+          context: { new_end_date: newEndDate },
+        },
+      }),
+      saveLeaseSnapshot(supabase, id, user.id, `Renovação — até ${new Date(newEndDate + 'T00:00:00').toLocaleDateString('pt-BR')}`),
+    ])
+
+    revalidatePath('/dashboard/contratos')
+    revalidatePath('/dashboard')
+    return null
+  } catch (err) {
+    return (err as Error).message || "Erro ao renovar contrato"
+  }
 }
 
 export async function distratoAction(formData: FormData) {
@@ -489,12 +540,9 @@ export async function distratoAction(formData: FormData) {
     }
 
     // 3. Auditoria Domain Event
-    await supabase.from('domain_events').insert({
-      user_id: user.id,
-      event_type: 'contract_terminated',
-      event_version: 1,
-      source: 'user',
-      payload: {
+    await supabase.rpc('log_domain_event', {
+      p_event_type: 'contract_terminated',
+      p_payload: {
         entity_id: id,
         entity_type: 'lease',
         timestamp: new Date().toISOString(),
@@ -509,5 +557,89 @@ export async function distratoAction(formData: FormData) {
     return null
   } catch (err) {
     return (err as Error).message || "Erro no processamento do distrato"
+  }
+}
+
+export async function sendContractEmailAction(leaseId: string): Promise<{ ok: true } | { error: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Não autenticado' }
+
+    const { data: leaseRaw } = await supabase
+      .from('leases')
+      .select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
+      .eq('id', leaseId)
+      .single()
+
+    if (!leaseRaw) return { error: 'Contrato não encontrado' }
+
+    const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
+      supabase.from('properties').select('name, address, city, state, type').eq('id', leaseRaw.property_id).single(),
+      supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', leaseRaw.tenant_id).single(),
+      leaseRaw.landlord_profile_id
+        ? supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('id', leaseRaw.landlord_profile_id).single()
+        : supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
+    ])
+
+    const tenant = tenantRaw as { name: string; email: string | null; document: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null } | null
+
+    if (!tenant?.email) return { error: 'Inquilino sem e-mail cadastrado' }
+
+    const ownerProfile = landlordProfileRaw as { name: string; document: string | null; phone: string | null; address: string | null; email?: string | null } | null
+    const ownerEmail = ownerProfile?.email ?? user.email
+
+    const pdfData = buildContratoPdfData({
+      leaseId,
+      lease: leaseRaw,
+      property: propertyRaw as Parameters<typeof buildContratoPdfData>[0]['property'],
+      tenant,
+      owner: {
+        name:     ownerProfile?.name     ?? user.email ?? '—',
+        document: ownerProfile?.document ?? null,
+        phone:    ownerProfile?.phone    ?? null,
+        address:  ownerProfile?.address  ?? null,
+      },
+    })
+
+    const buffer = await generateContratoPdfBuffer(pdfData)
+    const contractNum = leaseId.split('-')[0].toUpperCase()
+    const propertyName = (propertyRaw as { name: string } | null)?.name ?? 'imóvel'
+
+    const resend = getResend()
+
+    const toAddresses = [tenant.email]
+    const ccAddresses = ownerEmail && ownerEmail !== tenant.email ? [ownerEmail] : []
+
+    const emailBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+        <h2 style="color: #1a1a1a;">Contrato de Locação — ${propertyName}</h2>
+        <p>Olá,</p>
+        <p>Segue em anexo o contrato de locação referente ao imóvel <strong>${propertyName}</strong> (Ref. ${contractNum}).</p>
+        <p>Por favor, revise o documento, assine as duas vias e devolva uma delas ao locador.</p>
+        <p style="color: #888; font-size: 12px; margin-top: 32px;">
+          Este documento foi gerado eletronicamente pelo RentFlow.<br/>
+          Não substitui assessoria jurídica especializada.
+        </p>
+      </div>
+    `
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toAddresses,
+      cc: ccAddresses,
+      subject: `Contrato de Locação — ${propertyName}`,
+      html: emailBody,
+      attachments: [
+        {
+          filename: `contrato-${contractNum.toLowerCase()}.pdf`,
+          content: buffer,
+        },
+      ],
+    })
+
+    return { ok: true }
+  } catch (err) {
+    return { error: (err as Error).message || 'Erro ao enviar e-mail' }
   }
 }

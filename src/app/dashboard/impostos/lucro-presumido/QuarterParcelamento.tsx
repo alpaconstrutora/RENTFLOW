@@ -4,26 +4,28 @@ import { useState } from 'react'
 import type { ParcelamentoResult } from '../../../../lib/fiscal/parcelamento'
 
 interface Props {
-  quarter: string    // "Q1"
+  quarter: string
   year: number
   bruto: number
   csll: number
   irpj: number
+  irpjAdicional: number
   total: number
-  due: string        // vencimento à vista (DD/MM/YYYY)
-  months: string[]   // ex: ["2025-01","2025-02","2025-03"]
+  due: string
+  months: string[]
   parcelamento2: ParcelamentoResult
   parcelamento3: ParcelamentoResult
   selicAnual: number
-  fmt: (v: number) => string
-  fmtPct: (v: number) => string
 }
+
+const fmt    = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`
 
 type Mode = 'avista' | '2quotas' | '3quotas'
 
 export default function QuarterParcelamento({
-  quarter, year, bruto, csll, irpj, total, due, months,
-  parcelamento2, parcelamento3, selicAnual, fmt, fmtPct,
+  quarter, year, bruto, csll, irpj, irpjAdicional, total, due, months,
+  parcelamento2, parcelamento3, selicAnual,
 }: Props) {
   const [mode, setMode] = useState<Mode>('avista')
 
@@ -56,7 +58,17 @@ export default function QuarterParcelamento({
         </td>
         <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', textAlign: 'right' }}>{fmt(bruto)}</td>
         <td style={{ padding: '7px 10px', color: '#34d399', textAlign: 'right' }}>{fmt(csll)}</td>
-        <td style={{ padding: '7px 10px', color: '#fb923c', textAlign: 'right' }}>{fmt(irpj)}</td>
+        <td style={{ padding: '7px 10px', color: '#fb923c', textAlign: 'right' }}>
+          {fmt(irpj + irpjAdicional)}
+          {irpjAdicional > 0 && (
+            <span
+              title={`Base: ${fmt(irpj)} · Adicional 10%: ${fmt(irpjAdicional)}`}
+              style={{ display: 'block', fontSize: '9px', color: 'rgba(251,146,60,0.6)', marginTop: '1px' }}
+            >
+              +{fmt(irpjAdicional)} adic.
+            </span>
+          )}
+        </td>
         <td style={{ padding: '7px 10px', color: 'white', fontWeight: 600, textAlign: 'right' }}>{fmt(total)}</td>
         <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>

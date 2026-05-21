@@ -209,6 +209,21 @@ export default function LeaseButtonWithModal({ properties, tenants, landlordProf
                     </div>
                   </div>
 
+                  {/* Tipo de Garantia */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={labelStyle}>Tipo de Garantia</label>
+                    <select name="guarantee_type" defaultValue="nenhuma" style={inputStyle}>
+                      <option value="nenhuma">Sem garantia</option>
+                      <option value="fiador">Fiador</option>
+                      <option value="caucao">Caução</option>
+                      <option value="seguro_fianca">Seguro Fiança</option>
+                      <option value="titulo_capitalizacao">Título de Capitalização</option>
+                    </select>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Se "Fiador", os dados são gerenciados no cadastro do inquilino.
+                    </span>
+                  </div>
+
                   {/* Cláusula de Reajuste */}
                   <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '14px', padding: '16px' }}>
                     <p style={{ color: 'var(--accent-color)', fontSize: '12px', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

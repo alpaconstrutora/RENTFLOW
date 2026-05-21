@@ -23,3 +23,9 @@ export const PIS_RATE_DEFAULT    = 0.0065
 export const COFINS_RATE_DEFAULT = 0.030
 export const CSLL_RATE_DEFAULT   = 0.0288  // 9% × 32%
 export const IRPJ_RATE_DEFAULT   = 0.048   // 15% × 32%
+
+// IRPJ Adicional — Lei 9.430/96, art. 3º
+// Base presumida trimestral acima de R$60.000 paga +10% sobre o excedente.
+export const IRPJ_BASE_RATE                  = 0.15
+export const IRPJ_ADICIONAL_RATE             = 0.10
+export const IRPJ_ADICIONAL_THRESHOLD_QUARTER = 60_000

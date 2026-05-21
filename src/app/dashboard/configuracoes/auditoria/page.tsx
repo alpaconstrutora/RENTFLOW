@@ -1,4 +1,4 @@
-import { Shield, ArrowLeft } from 'lucide-react'
+import { Shield, ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import styles from '../../../page.module.css'
 import { createClient } from '../../../../utils/supabase/server'
@@ -129,9 +129,17 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
             <p className={styles.subtitle}>Registro imutável de todas as ações realizadas no sistema.</p>
           </div>
         </div>
-        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          {count ?? 0} evento{(count ?? 0) !== 1 ? 's' : ''}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {count ?? 0} evento{(count ?? 0) !== 1 ? 's' : ''}
+          </span>
+          <a
+            href={`/api/auditoria/export${params.tipo || params.fonte ? `?${new URLSearchParams({ ...(params.tipo ? { tipo: params.tipo } : {}), ...(params.fonte ? { fonte: params.fonte } : {}) })}` : ''}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.08)', color: 'var(--accent-color)', fontSize: '13px', fontWeight: 600, textDecoration: 'none' }}
+          >
+            <Download size={14} /> Exportar CSV
+          </a>
+        </div>
       </header>
 
       {/* Filtros */}

@@ -21,6 +21,7 @@ interface LeaseRow {
   iptu_paid_by: string | null
   condo_paid_by: string | null
   landlord_profile_id: string | null
+  guarantee_type: string | null
   property: { name: string } | null
   tenant: { name: string } | null
 }
@@ -56,35 +57,22 @@ function AlertBadge({ days, type }: { days: number, type: 'expiring' | 'adjustme
 export default async function ContratosPage() {
   const supabase = await createClient()
 
-  const { data: leasesRaw } = await supabase
-    .from('leases')
-    .select(`
-      id,
-      rent_value,
-      start_date,
-      end_date,
-      billing_start_date,
-      due_day,
-      active,
-      adjustment_index,
-      adjustment_period_months,
-      next_adjustment_date,
-      iptu_paid_by,
-      condo_paid_by,
-      landlord_profile_id,
-      property:properties(name),
-      tenant:tenants(name)
-    `)
-    .order('created_at', { ascending: false })
+  const [
+    { data: leasesRaw },
+    { data: rawProperties },
+    { data: rawTenants },
+    { data: rawLandlordProfiles },
+  ] = await Promise.all([
+    supabase
+      .from('leases')
+      .select(`id,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property:properties(name),tenant:tenants(name)`)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    supabase.from('properties').select('id, name, status').limit(200),
+    supabase.from('tenants').select('id, name').limit(200),
+    supabase.from('landlord_profiles').select('id, name, person_type, document, is_default').order('is_default', { ascending: false }).order('name').limit(50),
+  ])
   const leases = leasesRaw as LeaseRow[] | null
-
-  const { data: rawProperties } = await supabase.from('properties').select('id, name, status')
-  const { data: rawTenants } = await supabase.from('tenants').select('id, name')
-  const { data: rawLandlordProfiles } = await supabase
-    .from('landlord_profiles')
-    .select('id, name, person_type, document, is_default')
-    .order('is_default', { ascending: false })
-    .order('name')
 
   const properties       = rawProperties       || []
   const tenants          = rawTenants          || []
