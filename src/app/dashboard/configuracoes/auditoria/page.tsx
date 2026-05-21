@@ -1,7 +1,7 @@
 import { Shield, ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import styles from '../../../page.module.css'
-import { createClientWithUser } from '../../../../utils/supabase/server'
+import { createClient } from '../../../../utils/supabase/server'
 
 interface SearchParams { tipo?: string; fonte?: string; pagina?: string }
 
@@ -70,7 +70,9 @@ const POR_PAGINA = 50
 
 export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
   const pagina = Math.max(1, parseInt(params.pagina ?? '1'))

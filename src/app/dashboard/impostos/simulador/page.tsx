@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import styles from '../../../../app/page.module.css'
-import { createClientWithUser } from '../../../../utils/supabase/server'
+import { createClient } from '../../../../utils/supabase/server'
 import SimuladorClient from './SimuladorClient'
 import type { IrpfBracket, SimuladorPJRates } from '../../../../lib/fiscal/simulador'
 
 export default async function SimuladorPage() {
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   // Faixas IRPF vigentes hoje (mais recentes)

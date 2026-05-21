@@ -1,10 +1,11 @@
 import styles from '../../page.module.css'
-import { createClientWithUser } from '../../../utils/supabase/server'
+import { createClient } from '../../../utils/supabase/server'
 import Link from 'next/link'
 import { Calculator, ChevronRight, Landmark, Building2, GitCompare } from 'lucide-react'
 
 export default async function ImpostosPage() {
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id })
   const currentMonth = ((todayStr as string) || new Date().toISOString()).slice(0, 7)
 

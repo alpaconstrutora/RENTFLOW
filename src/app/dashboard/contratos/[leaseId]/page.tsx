@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createClientWithUser } from '../../../../utils/supabase/server'
+import { createClient } from '../../../../utils/supabase/server'
 import PrintBtn from './PrintBtn'
 import SendContractEmailBtn from './SendContractEmailBtn'
 
@@ -67,7 +67,9 @@ function guaranteeLabel(type: GuaranteeType): string {
 
 export default async function ContratoPage({ params }: { params: Promise<{ leaseId: string }> }) {
   const { leaseId } = await params
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
 
   const { data: lease } = await supabase

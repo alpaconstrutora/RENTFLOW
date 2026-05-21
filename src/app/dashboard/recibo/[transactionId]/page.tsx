@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createClientWithUser } from '../../../../utils/supabase/server'
+import { createClient } from '../../../../utils/supabase/server'
 import PrintBtn from './PrintBtn'
 
 function valorPorExtenso(valor: number): string {
@@ -57,7 +57,9 @@ function mesAno(billing: string | null) {
 
 export default async function ReciboPage({ params }: { params: Promise<{ transactionId: string }> }) {
   const { transactionId } = await params
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
 
   const { data: tx } = await supabase

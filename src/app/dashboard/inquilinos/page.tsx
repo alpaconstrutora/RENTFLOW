@@ -1,6 +1,6 @@
 import { Users } from 'lucide-react'
 import styles from '../../page.module.css'
-import { createClientWithUser } from '../../../utils/supabase/server'
+import { createClient } from '../../../utils/supabase/server'
 import TenantButtonWithModal from './TenantButtonWithModal'
 import TenantEditBtn from './TenantEditBtn'
 import TenantDeleteBtn from './TenantDeleteBtn'
@@ -32,7 +32,8 @@ interface TenantRow {
 }
 
 export default async function InquilinosPage() {
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: tenantsRaw } = await supabase
     .from('tenants')

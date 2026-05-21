@@ -4,10 +4,11 @@ import {
   DoorOpen, Clock, CalendarX, Trophy, Bell
 } from 'lucide-react'
 import styles from '../page.module.css'
-import { createClientWithUser } from '../../utils/supabase/server'
+import { createClient } from '../../utils/supabase/server'
 
 export default async function Dashboard() {
-  const { supabase, user } = await createClientWithUser()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
   // Compute today in BR timezone locally — no extra round-trip needed
