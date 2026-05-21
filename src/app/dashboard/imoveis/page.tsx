@@ -1,6 +1,6 @@
 import { TrendingUp } from 'lucide-react'
 import styles from '../../page.module.css'
-import { createClient } from '../../../utils/supabase/server'
+import { createClientWithUser } from '../../../utils/supabase/server'
 import ImovelButtonWithModal from './ImovelButtonWithModal'
 import ImovelEditBtn from './ImovelEditBtn'
 import ImovelDeleteBtn from './ImovelDeleteBtn'
@@ -37,8 +37,7 @@ interface PropertyRow {
 }
 
 export default async function ImoveisPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await createClientWithUser()
 
   const [{ data: propertiesRaw }, { data: profitSummary }] = await Promise.all([
     supabase

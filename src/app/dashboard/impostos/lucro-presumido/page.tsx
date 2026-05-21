@@ -1,5 +1,5 @@
 import styles from '../../../page.module.css'
-import { createClient } from '../../../../utils/supabase/server'
+import { createClientWithUser } from '../../../../utils/supabase/server'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import YearFilter from '../YearFilter'
@@ -19,8 +19,7 @@ interface SearchParams { ano?: string }
 
 export default async function LucroPresumidoPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { ano } = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await createClientWithUser()
 
   const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id })
   const currentYearStr = ((todayStr as string) || new Date().toISOString()).split('-')[0]

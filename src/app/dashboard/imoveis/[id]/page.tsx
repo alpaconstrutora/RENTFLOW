@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createClient } from '../../../../utils/supabase/server'
+import { createClientWithUser } from '../../../../utils/supabase/server'
 import Link from 'next/link'
 import { ArrowLeft, TrendingUp, Building2, FileText, ArrowUpRight, ArrowDownRight, CalendarClock } from 'lucide-react'
 
@@ -33,9 +33,7 @@ function mesLabel(billing: string) {
 
 export default async function ImovelDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await createClientWithUser()
   if (!user) notFound()
 
   const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })

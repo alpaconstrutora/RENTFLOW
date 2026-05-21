@@ -1,4 +1,4 @@
-import { createClient } from '../../../../utils/supabase/server'
+import { createClientWithUser } from '../../../../utils/supabase/server'
 import styles from '../../../page.module.css'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -8,8 +8,7 @@ import ReportActions from '../../relatorios/ReportActions'
 // Usamos `searchParams` em vez de route param, assim /dashboard/impostos/declaracao?ano=2026
 export default async function ImpostosDeclaracaoPage({ searchParams }: { searchParams: Promise<{ ano?: string, year?: string }> }) {
   const resolvedParams = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await createClientWithUser()
   if (!user) redirect('/login')
 
   const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })

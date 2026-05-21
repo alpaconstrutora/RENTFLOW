@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Info } from 'lucide-react'
 import styles from '../../../../../app/page.module.css'
-import { createClient } from '../../../../../utils/supabase/server'
+import { createClientWithUser } from '../../../../../utils/supabase/server'
 import MonthNav from './MonthNav'
 import IrrfInput from './IrrfInput'
 import RecalcBtn from './RecalcBtn'
@@ -15,8 +15,7 @@ export default async function CarneLeaoMesPage({ params }: { params: Promise<{ m
 
   if (!/^\d{4}-\d{2}$/.test(mes)) redirect('/dashboard/impostos')
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { supabase, user } = await createClientWithUser()
   if (!user) redirect('/login')
 
   const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })

@@ -1,15 +1,15 @@
 import styles from '../../page.module.css'
-import { createClient } from '../../../utils/supabase/server'
+import { createClientWithUser } from '../../../utils/supabase/server'
 import ReportActions from './ReportActions'
 
 interface SearchParams { ano?: string }
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const resolvedParams = await searchParams
-  const supabase = await createClient()
+  const { supabase, user } = await createClientWithUser()
 
   // C4: user_today via RPC
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: (await supabase.auth.getUser()).data.user?.id ?? '' })
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id ?? '' })
   const today = (todayStr as string) ?? new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
   const currentYear = parseInt(today.split('-')[0])
   
