@@ -22,3 +22,11 @@ export function formatTimings(records: TimingRecord[]): string {
   const parts = records.map((r) => `${r.label}=${r.ms}ms`).join(' · ')
   return `TOTAL=${total}ms · ${parts}`
 }
+
+// Mede o tempo de uma promise individual. Útil pra timing por query
+// dentro de um Promise.all — cada uma reporta paralelamente.
+export async function timeIt<T>(label: string, p: PromiseLike<T>): Promise<{ label: string; ms: number; result: T }> {
+  const t0 = Date.now()
+  const result = await p
+  return { label, ms: Date.now() - t0, result }
+}
