@@ -7,17 +7,12 @@ import { redirect } from 'next/navigation'
 import styles from '../page.module.css'
 import { createClient } from '../../utils/supabase/server'
 import { getCurrentUserId } from '../../utils/supabase/user'
-import { startTimer, formatTimings, timeIt } from '../../utils/perf-debug'
 
 export default async function Dashboard() {
-  const timer = startTimer()
-
   const userId = await getCurrentUserId()
-  timer.mark('getCurrentUserId')
   if (!userId) redirect('/login')
 
   const supabase = await createClient()
-  timer.mark('createClient')
 
   // Compute today in BR timezone locally — no extra round-trip needed
   const today = new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
@@ -32,55 +27,42 @@ export default async function Dashboard() {
   const day30AgoStr= addDays(todayDate, -30)
   const d365AgoStr = addDays(todayDate,-365)
 
-  // All 16 queries in one parallel round-trip — instrumentadas para timing individual
-  const queryResults = await Promise.all([
-    timeIt('q1_inc_month',    supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfMonth)),
-    timeIt('q2_exp_month',    supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfMonth)),
-    timeIt('q3_inc_ytd',      supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfYear)),
-    timeIt('q4_exp_ytd',      supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfYear)),
-    timeIt('q5_late_inc',     supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('billing_month', startOfMonth)),
-    timeIt('q6_expected_inc', supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('billing_month', startOfMonth)),
-    timeIt('q7_late_30d',     supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('due_date', day30AgoStr).lte('due_date', today)),
-    timeIt('q8_exp_30d',      supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('due_date', day30AgoStr).lte('due_date', today)),
-    timeIt('q9_paid_hist',    supabase.from('transactions_view').select('paid_date, due_date').eq('type','income').eq('status','paid').not('paid_date','is',null).gte('paid_date', d365AgoStr)),
-    timeIt('q10_total_props', supabase.from('properties').select('*', { count: 'exact', head: true })),
-    timeIt('q11_rented',      supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status','rented')),
-    timeIt('q12_venc_7d',     supabase.from('transactions_view').select('id, amount, due_date, type, property_id').in('status',['pending','late']).gte('due_date', today).lte('due_date', day7Str).order('due_date')),
-    timeIt('q13_expiring',    supabase.from('leases').select('id, end_date, rent_value, property:properties(name)').eq('active',true).not('end_date','is',null).gte('end_date', today).lte('end_date', day30Str).order('end_date')),
-    timeIt('q14_allProps',    supabase.from('properties').select('id, name, purchase_value, leases!inner(rent_value, active)').gt('purchase_value',0).eq('leases.active',true)),
-    timeIt('q15_alerts_rpc',  supabase.rpc('get_lease_alerts', { p_user_id: userId })),
-    timeIt('q16_billing_rpc', supabase.rpc('get_last_billing_status')),
-  ])
-  timer.mark('16 queries (Promise.all)')
-
-  // Extrai os results na ordem
+  // All 16 queries in one parallel round-trip
   const [
-    { result: { data: incomes } },
-    { result: { data: expenses } },
-    { result: { data: incomesYtd } },
-    { result: { data: expensesYtd } },
-    { result: { data: lateInc } },
-    { result: { data: expectedInc } },
-    { result: { data: lateRolling } },
-    { result: { data: expRolling } },
-    { result: { data: paidHist } },
-    { result: { count: totalProps } },
-    { result: { count: rentedProps } },
-    { result: { data: vencD7 } },
-    { result: { data: expiringLeasesRaw } },
-    { result: { data: allProps } },
-    { result: { data: leaseAlerts } },
-    { result: { data: billingStatus } },
-  ] = queryResults
-
-  // Ordena timings das queries por duração (mais lenta primeiro) pra debug
-  const querTimings = [...queryResults]
-    .sort((a, b) => b.ms - a.ms)
-    .map((r) => `${r.label}=${r.ms}ms`)
-    .join(' · ')
-
-  const region = process.env.VERCEL_REGION ?? 'unknown'
-  const perfReport = `region=${region} · ${formatTimings(timer.records)}`
+    { data: incomes },
+    { data: expenses },
+    { data: incomesYtd },
+    { data: expensesYtd },
+    { data: lateInc },
+    { data: expectedInc },
+    { data: lateRolling },
+    { data: expRolling },
+    { data: paidHist },
+    { count: totalProps },
+    { count: rentedProps },
+    { data: vencD7 },
+    { data: expiringLeasesRaw },
+    { data: allProps },
+    { data: leaseAlerts },
+    { data: billingStatus },
+  ] = await Promise.all([
+    supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('net_amount').eq('type','income').eq('status','paid').gte('billing_month', startOfYear),
+    supabase.from('transactions_view').select('net_amount').eq('type','expense').eq('status','paid').gte('billing_month', startOfYear),
+    supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('billing_month', startOfMonth),
+    supabase.from('transactions_view').select('amount').eq('type','income').eq('status','late').gte('due_date', day30AgoStr).lte('due_date', today),
+    supabase.from('transactions_view').select('amount').eq('type','income').in('status',['pending','paid','late']).gte('due_date', day30AgoStr).lte('due_date', today),
+    supabase.from('transactions_view').select('paid_date, due_date').eq('type','income').eq('status','paid').not('paid_date','is',null).gte('paid_date', d365AgoStr),
+    supabase.from('properties').select('*', { count: 'exact', head: true }),
+    supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status','rented'),
+    supabase.from('transactions_view').select('id, amount, due_date, type, property_id').in('status',['pending','late']).gte('due_date', today).lte('due_date', day7Str).order('due_date'),
+    supabase.from('leases').select('id, end_date, rent_value, property:properties(name)').eq('active',true).not('end_date','is',null).gte('end_date', today).lte('end_date', day30Str).order('end_date'),
+    supabase.from('properties').select('id, name, purchase_value, leases!inner(rent_value, active)').gt('purchase_value',0).eq('leases.active',true),
+    supabase.rpc('get_lease_alerts', { p_user_id: userId }),
+    supabase.rpc('get_last_billing_status'),
+  ])
 
   // ── KPI 1
   const totalIncome  = incomes?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
@@ -139,11 +121,6 @@ export default async function Dashboard() {
 
   return (
     <>
-      {/* DEBUG TIMING — remover após diagnóstico */}
-      <div style={{ background: '#1e1b4b', border: '1px solid #6366f1', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '11px', fontFamily: 'monospace', color: '#c7d2fe' }}>
-        <div>⏱ {perfReport}</div>
-        <div style={{ marginTop: '4px', color: '#a5b4fc' }}>queries ordenadas por duração: {querTimings}</div>
-      </div>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Dashboard Financeiro</h1>
