@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
 import { getCurrentUserId } from '../../../utils/supabase/user'
+import { startTimer, formatTimings } from '../../../utils/perf-debug'
 import TenantButtonWithModal from './TenantButtonWithModal'
 import TenantEditBtn from './TenantEditBtn'
 import TenantDeleteBtn from './TenantDeleteBtn'
@@ -34,10 +35,14 @@ interface TenantRow {
 }
 
 export default async function InquilinosPage() {
+  const timer = startTimer()
+
   const userId = await getCurrentUserId()
+  timer.mark('getCurrentUserId')
   if (!userId) redirect('/login')
 
   const supabase = await createClient()
+  timer.mark('createClient')
 
   const { data: tenantsRaw } = await supabase
     .from('tenants')
@@ -49,8 +54,10 @@ export default async function InquilinosPage() {
     `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+  timer.mark('query tenants')
 
   const tenants = (tenantsRaw ?? []) as TenantRow[]
+  const perfReport = formatTimings(timer.records)
 
   function addressLine(t: TenantRow): string | null {
     if (t.street) {
@@ -62,6 +69,10 @@ export default async function InquilinosPage() {
 
   return (
     <>
+      {/* DEBUG TIMING — remover após diagnóstico */}
+      <div style={{ background: '#1e1b4b', border: '1px solid #6366f1', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '11px', fontFamily: 'monospace', color: '#c7d2fe' }}>
+        ⏱ server render: {perfReport}
+      </div>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Inquilinos</h1>

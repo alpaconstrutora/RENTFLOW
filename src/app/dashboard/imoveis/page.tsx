@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
 import { getCurrentUserId } from '../../../utils/supabase/user'
+import { startTimer, formatTimings } from '../../../utils/perf-debug'
 import ImovelButtonWithModal from './ImovelButtonWithModal'
 import ImovelEditBtn from './ImovelEditBtn'
 import ImovelDeleteBtn from './ImovelDeleteBtn'
@@ -39,10 +40,14 @@ interface PropertyRow {
 }
 
 export default async function ImoveisPage() {
+  const timer = startTimer()
+
   const userId = await getCurrentUserId()
+  timer.mark('getCurrentUserId')
   if (!userId) redirect('/login')
 
   const supabase = await createClient()
+  timer.mark('createClient')
 
   const [{ data: propertiesRaw }, { data: profitSummary }] = await Promise.all([
     supabase
@@ -57,6 +62,8 @@ export default async function ImoveisPage() {
       .order('created_at', { ascending: false }),
     supabase.rpc('get_property_profit_summary'),
   ])
+  timer.mark('queries (properties + profit RPC)')
+  const perfReport = formatTimings(timer.records)
 
   const properties = (propertiesRaw ?? []) as PropertyRow[]
 
@@ -82,6 +89,10 @@ export default async function ImoveisPage() {
 
   return (
     <>
+      {/* DEBUG TIMING — remover após diagnóstico */}
+      <div style={{ background: '#1e1b4b', border: '1px solid #6366f1', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '11px', fontFamily: 'monospace', color: '#c7d2fe' }}>
+        ⏱ server render: {perfReport}
+      </div>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Meus Imóveis</h1>

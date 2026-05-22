@@ -7,12 +7,17 @@ import { redirect } from 'next/navigation'
 import styles from '../page.module.css'
 import { createClient } from '../../utils/supabase/server'
 import { getCurrentUserId } from '../../utils/supabase/user'
+import { startTimer, formatTimings } from '../../utils/perf-debug'
 
 export default async function Dashboard() {
+  const timer = startTimer()
+
   const userId = await getCurrentUserId()
+  timer.mark('getCurrentUserId')
   if (!userId) redirect('/login')
 
   const supabase = await createClient()
+  timer.mark('createClient')
 
   // Compute today in BR timezone locally — no extra round-trip needed
   const today = new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
@@ -63,6 +68,8 @@ export default async function Dashboard() {
     supabase.rpc('get_lease_alerts', { p_user_id: userId }),
     supabase.rpc('get_last_billing_status'),
   ])
+  timer.mark('16 queries (Promise.all)')
+  const perfReport = formatTimings(timer.records)
 
   // ── KPI 1
   const totalIncome  = incomes?.reduce((s, t) => s + Number(t.net_amount), 0) || 0
@@ -121,6 +128,10 @@ export default async function Dashboard() {
 
   return (
     <>
+      {/* DEBUG TIMING — remover após diagnóstico */}
+      <div style={{ background: '#1e1b4b', border: '1px solid #6366f1', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '11px', fontFamily: 'monospace', color: '#c7d2fe' }}>
+        ⏱ server render: {perfReport}
+      </div>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Dashboard Financeiro</h1>
