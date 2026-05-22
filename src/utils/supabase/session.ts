@@ -45,6 +45,22 @@ export async function updateSession(request: NextRequest) {
     // Edge runtime: se Supabase não estiver acessível, trata como não autenticado
   }
 
+  // Propaga user.id para handlers downstream via header.
+  // Páginas leem esse header (via getCurrentUserId helper) e evitam o
+  // segundo getUser() — economiza um roundtrip de ~150ms por navegação.
+  if (user) {
+    const headersWithUserId = new Headers(request.headers)
+    headersWithUserId.set('x-rentflow-user-id', user.id)
+
+    const previousCookies = supabaseResponse.cookies.getAll()
+    supabaseResponse = NextResponse.next({
+      request: { headers: headersWithUserId },
+    })
+    previousCookies.forEach((cookie) => {
+      supabaseResponse.cookies.set(cookie)
+    })
+  }
+
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
 
   if (!user && isProtectedRoute) {

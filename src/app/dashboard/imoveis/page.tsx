@@ -1,6 +1,8 @@
 import { TrendingUp } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../utils/supabase/user'
 import ImovelButtonWithModal from './ImovelButtonWithModal'
 import ImovelEditBtn from './ImovelEditBtn'
 import ImovelDeleteBtn from './ImovelDeleteBtn'
@@ -37,8 +39,10 @@ interface PropertyRow {
 }
 
 export default async function ImoveisPage() {
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: propertiesRaw }, { data: profitSummary }] = await Promise.all([
     supabase
@@ -49,7 +53,7 @@ export default async function ImoveisPage() {
         zip_code, street, street_number, district, city, state,
         leases ( rent_value, active )
       `)
-      .eq('user_id', user?.id ?? '')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabase.rpc('get_property_profit_summary'),
   ])
