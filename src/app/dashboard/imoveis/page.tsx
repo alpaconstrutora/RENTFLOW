@@ -40,7 +40,7 @@ export default async function ImoveisPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: propertiesRaw, error: propError }, { data: profitSummary }] = await Promise.all([
+  const [{ data: propertiesRaw }, { data: profitSummary }] = await Promise.all([
     supabase
       .from('properties')
       .select(`
@@ -78,13 +78,6 @@ export default async function ImoveisPage() {
 
   return (
     <>
-      {/* DEBUG — remover após diagnóstico */}
-      <div style={{ background: '#1e1b4b', border: '1px solid #6366f1', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', fontFamily: 'monospace', color: '#a5b4fc' }}>
-        <strong style={{ color: '#c7d2fe' }}>DEBUG:</strong>{' '}
-        user.id = <span style={{ color: '#fbbf24' }}>{user?.id ?? 'NULL'}</span>{' · '}
-        properties = <span style={{ color: '#34d399' }}>{propertiesRaw?.length ?? 'null'}</span>{' · '}
-        error = <span style={{ color: '#f87171' }}>{propError ? JSON.stringify(propError) : 'nenhum'}</span>
-      </div>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Meus Imóveis</h1>
