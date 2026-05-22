@@ -1,15 +1,20 @@
+import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../utils/supabase/user'
 import ReportActions from './ReportActions'
 
 interface SearchParams { ano?: string }
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const resolvedParams = await searchParams
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
 
   // C4: user_today via RPC
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: (await supabase.auth.getUser()).data.user?.id ?? '' })
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const today = (todayStr as string) ?? new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
   const currentYear = parseInt(today.split('-')[0])
   

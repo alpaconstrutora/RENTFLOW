@@ -1,5 +1,7 @@
+import { redirect } from 'next/navigation'
 import styles from '../../../page.module.css'
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import TaxConfigForm from '../TaxConfigForm'
 import YearFilter from '../YearFilter'
 import Link from 'next/link'
@@ -9,6 +11,9 @@ interface SearchParams { ano?: string }
 
 export default async function IbsCbsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const resolvedParams = await searchParams
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
 
   const { data: taxConfig } = await supabase
@@ -16,8 +21,7 @@ export default async function IbsCbsPage({ searchParams }: { searchParams: Promi
     .select('*')
     .single()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id })
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const currentYearStr = ((todayStr as string) || new Date().toISOString()).split('-')[0]
   const currentYear   = parseInt(currentYearStr)
 

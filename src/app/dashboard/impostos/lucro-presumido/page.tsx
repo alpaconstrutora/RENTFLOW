@@ -1,5 +1,7 @@
+import { redirect } from 'next/navigation'
 import styles from '../../../page.module.css'
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import YearFilter from '../YearFilter'
@@ -19,10 +21,12 @@ interface SearchParams { ano?: string }
 
 export default async function LucroPresumidoPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { ano } = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
 
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id })
+  const supabase = await createClient()
+
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const currentYearStr = ((todayStr as string) || new Date().toISOString()).split('-')[0]
   const currentYear    = parseInt(currentYearStr)
   const yr             = ano || currentYearStr

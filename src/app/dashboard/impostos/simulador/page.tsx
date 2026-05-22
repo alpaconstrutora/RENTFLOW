@@ -3,13 +3,15 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import styles from '../../../../app/page.module.css'
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import SimuladorClient from './SimuladorClient'
 import type { IrpfBracket, SimuladorPJRates } from '../../../../lib/fiscal/simulador'
 
 export default async function SimuladorPage() {
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   // Faixas IRPF vigentes hoje (mais recentes)
   const { data: bracketsRaw } = await supabase
@@ -33,7 +35,7 @@ export default async function SimuladorPage() {
   const { data: pjConfig } = await supabase
     .from('pj_tax_config')
     .select('pis_rate, cofins_rate, csll_rate, irpj_rate')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle()
 
   const rates: SimuladorPJRates = {

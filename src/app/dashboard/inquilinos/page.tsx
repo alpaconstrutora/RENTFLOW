@@ -1,6 +1,8 @@
 import { Users } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../utils/supabase/user'
 import TenantButtonWithModal from './TenantButtonWithModal'
 import TenantEditBtn from './TenantEditBtn'
 import TenantDeleteBtn from './TenantDeleteBtn'
@@ -32,8 +34,10 @@ interface TenantRow {
 }
 
 export default async function InquilinosPage() {
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: tenantsRaw } = await supabase
     .from('tenants')
@@ -43,7 +47,7 @@ export default async function InquilinosPage() {
       zip_code, street, street_number, district, city, state, address_complement,
       photo_url, guarantor_name, guarantor_document, notes
     `)
-    .eq('user_id', user?.id ?? '')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   const tenants = (tenantsRaw ?? []) as TenantRow[]
@@ -64,7 +68,7 @@ export default async function InquilinosPage() {
           <p className={styles.subtitle}>Cadastro de pessoas físicas e jurídicas da sua carteira.</p>
         </div>
         <div className={styles.actions}>
-          <TenantButtonWithModal userId={user?.id ?? ''} />
+          <TenantButtonWithModal userId={userId} />
         </div>
       </header>
 
@@ -127,7 +131,7 @@ export default async function InquilinosPage() {
 
                   <td style={{ padding: '16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '16px' }}>
-                      <TenantEditBtn userId={user?.id ?? ''} tenant={tenant} />
+                      <TenantEditBtn userId={userId} tenant={tenant} />
                       <TenantDeleteBtn id={tenant.id} />
                     </div>
                   </td>

@@ -88,7 +88,7 @@ export default async function ImoveisPage() {
           <p className={styles.subtitle}>Portfólio físico com ROI, Yield e status de ocupação em tempo real.</p>
         </div>
         <div className={styles.actions}>
-          <ImovelButtonWithModal userId={user?.id ?? ''} />
+          <ImovelButtonWithModal userId={userId} />
         </div>
       </header>
 
@@ -198,7 +198,7 @@ export default async function ImoveisPage() {
                       <a href={`/dashboard/imoveis/${prop.id}`} style={{ fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>
                         Detalhes
                       </a>
-                      <ImovelEditBtn userId={user?.id ?? ''} property={prop} />
+                      <ImovelEditBtn userId={userId} property={prop} />
                       <ImovelDeleteBtn id={prop.id} />
                     </div>
                   </td>

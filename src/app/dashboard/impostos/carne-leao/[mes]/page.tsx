@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft, Info } from 'lucide-react'
 import styles from '../../../../../app/page.module.css'
 import { createClient } from '../../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../../utils/supabase/user'
 import MonthNav from './MonthNav'
 import IrrfInput from './IrrfInput'
 import RecalcBtn from './RecalcBtn'
@@ -15,11 +16,11 @@ export default async function CarneLeaoMesPage({ params }: { params: Promise<{ m
 
   if (!/^\d{4}-\d{2}$/.test(mes)) redirect('/dashboard/impostos')
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
 
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })
+  const supabase = await createClient()
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const currentMes = ((todayStr as string) || new Date().toISOString()).slice(0, 7)
 
   const [y, m] = mes.split('-').map(Number)

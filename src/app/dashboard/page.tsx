@@ -3,13 +3,16 @@ import {
   ArrowUpRight, ArrowDownRight, AlertTriangle,
   DoorOpen, Clock, CalendarX, Trophy, Bell
 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import styles from '../page.module.css'
 import { createClient } from '../../utils/supabase/server'
+import { getCurrentUserId } from '../../utils/supabase/user'
 
 export default async function Dashboard() {
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
 
   // Compute today in BR timezone locally — no extra round-trip needed
   const today = new Date().toLocaleString('sv', { timeZone: 'America/Sao_Paulo' }).split(' ')[0]
@@ -57,7 +60,7 @@ export default async function Dashboard() {
     supabase.from('transactions_view').select('id, amount, due_date, type, property_id').in('status',['pending','late']).gte('due_date', today).lte('due_date', day7Str).order('due_date'),
     supabase.from('leases').select('id, end_date, rent_value, property:properties(name)').eq('active',true).not('end_date','is',null).gte('end_date', today).lte('end_date', day30Str).order('end_date'),
     supabase.from('properties').select('id, name, purchase_value, leases!inner(rent_value, active)').gt('purchase_value',0).eq('leases.active',true),
-    supabase.rpc('get_lease_alerts', { p_user_id: user.id }),
+    supabase.rpc('get_lease_alerts', { p_user_id: userId }),
     supabase.rpc('get_last_billing_status'),
   ])
 

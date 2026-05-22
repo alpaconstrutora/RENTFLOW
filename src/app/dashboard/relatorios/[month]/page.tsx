@@ -1,4 +1,5 @@
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import styles from '../../../page.module.css'
 import ReportActions from '../ReportActions'
 import Link from 'next/link'
@@ -13,9 +14,10 @@ export default async function RelatorioMensalPage({ params }: { params: Promise<
     redirect('/dashboard/relatorios')
   }
 
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   const startOfMonth = `${monthParam}-01`
   // We determine the end of the month by getting the start of next month

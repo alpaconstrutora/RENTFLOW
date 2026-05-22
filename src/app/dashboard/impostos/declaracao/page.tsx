@@ -1,4 +1,5 @@
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import styles from '../../../page.module.css'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -8,11 +9,11 @@ import ReportActions from '../../relatorios/ReportActions'
 // Usamos `searchParams` em vez de route param, assim /dashboard/impostos/declaracao?ano=2026
 export default async function ImpostosDeclaracaoPage({ searchParams }: { searchParams: Promise<{ ano?: string, year?: string }> }) {
   const resolvedParams = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
 
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })
+  const supabase = await createClient()
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const defaultYear = ((todayStr as string) || new Date().toISOString()).split('-')[0]
   
   const year = resolvedParams.ano || resolvedParams.year || defaultYear
@@ -23,7 +24,7 @@ export default async function ImpostosDeclaracaoPage({ searchParams }: { searchP
   const endOfYear = `${parseInt(year) + 1}-01-01`
 
   // Buscar perfil
-  const { data: profile } = await supabase.from('profiles').select('name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('name').eq('id', userId).single()
   const ownerName = profile?.name || 'Sócio(a) Administrador(a) Não Informado'
 
   // Invariante #13 — leitura via transactions_view, nunca tabela direta

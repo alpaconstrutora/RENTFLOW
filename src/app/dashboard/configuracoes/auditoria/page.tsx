@@ -1,7 +1,9 @@
 import { Shield, ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import styles from '../../../page.module.css'
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 
 interface SearchParams { tipo?: string; fonte?: string; pagina?: string }
 
@@ -70,10 +72,10 @@ const POR_PAGINA = 50
 
 export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
-  const supabase = await createClient()
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const supabase = await createClient()
 
   const pagina = Math.max(1, parseInt(params.pagina ?? '1'))
   const offset = (pagina - 1) * POR_PAGINA
@@ -81,7 +83,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
   let query = supabase
     .from('domain_events')
     .select('id, event_type, event_version, source, payload, created_at', { count: 'exact' })
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + POR_PAGINA - 1)
 

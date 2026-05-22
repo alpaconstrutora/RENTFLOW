@@ -1,12 +1,16 @@
+import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../utils/supabase/user'
 import Link from 'next/link'
 import { Calculator, ChevronRight, Landmark, Building2, GitCompare } from 'lucide-react'
 
 export default async function ImpostosPage() {
+  const userId = await getCurrentUserId()
+  if (!userId) redirect('/login')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user?.id })
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const currentMonth = ((todayStr as string) || new Date().toISOString()).slice(0, 7)
 
   const cards = [

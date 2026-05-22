@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '../../../../utils/supabase/server'
+import { getCurrentUserId } from '../../../../utils/supabase/user'
 import Link from 'next/link'
 import { ArrowLeft, TrendingUp, Building2, FileText, ArrowUpRight, ArrowDownRight, CalendarClock } from 'lucide-react'
 
@@ -33,12 +34,11 @@ function mesLabel(billing: string) {
 
 export default async function ImovelDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const userId = await getCurrentUserId()
+  if (!userId) notFound()
+
   const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) notFound()
-
-  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: user.id })
+  const { data: todayStr } = await supabase.rpc('user_today', { p_user_id: userId })
   const today = (todayStr as string) || new Date().toISOString().split('T')[0]
   const [yr] = today.split('-')
   const startOfYear = `${yr}-01-01`
@@ -48,7 +48,7 @@ export default async function ImovelDetailPage({ params }: { params: Promise<{ i
     .from('properties')
     .select('id, name, type, status, expected_rent, purchase_value, address, notes, photo_url, zip_code, street, street_number, district, city, state')
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single()
 
   if (!prop) notFound()
