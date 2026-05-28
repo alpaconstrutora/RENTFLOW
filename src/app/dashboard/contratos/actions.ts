@@ -15,9 +15,10 @@ async function saveLeaseSnapshot(
   label: string
 ) {
   try {
-    const [{ data: leaseFullRaw }, { data: propertyRaw }, userRes] = await Promise.all([
+    const [{ data: leaseFullRaw }, { data: propertyRaw }, { data: discountsRaw }, userRes] = await Promise.all([
       supabase.from('leases').select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by').eq('id', leaseId).single(),
       supabase.from('leases').select('properties(name, address, city, state, type)').eq('id', leaseId).single(),
+      supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
       supabase.auth.getUser(),
     ])
     if (!leaseFullRaw) return
@@ -56,6 +57,7 @@ async function saveLeaseSnapshot(
       property,
       tenant: tenantRaw as Parameters<typeof buildContratoPdfData>[0]['tenant'],
       owner: ownerData,
+      discounts: discountsRaw ?? []
     })
 
     const buffer = await generateContratoPdfBuffer(pdfData)
@@ -131,6 +133,7 @@ export async function createLeaseAction(formData: FormData) {
     const condoPaidBy        = (formData.get('condo_paid_by')         as string) || 'tenant'
     const landlordProfileId  = (formData.get('landlord_profile_id')   as string) || null
     const guaranteeType      = (formData.get('guarantee_type')         as string) || 'nenhuma'
+    const leaseDiscountsRaw  = (formData.get('lease_discounts_json')   as string) || '[]'
 
     if (!propertyId || !tenantId || !startDate) {
       return "Campos obrigatórios ausentes."
@@ -158,6 +161,21 @@ export async function createLeaseAction(formData: FormData) {
 
     if (error) return error.message
 
+    // Salvar descontos
+    const discounts = JSON.parse(leaseDiscountsRaw)
+    if (discounts && discounts.length > 0) {
+      const { error: discError } = await supabase.from('lease_discounts').insert(
+        discounts.map((d: any) => ({
+          lease_id: insertedLease.id,
+          user_id: user.id,
+          start_installment: parseInt(d.start_installment),
+          end_installment: parseInt(d.end_installment),
+          discount_value: parseFloat(d.discount_value)
+        }))
+      )
+      if (discError) return discError.message
+    }
+
     // C1 + C4: billing_month via user_today() — nunca new Date() do JS
     const { billingMonth, today } = await getUserBillingMonth(supabase, user.id)
     const [year, month] = today.split('-').map(Number)
@@ -171,12 +189,24 @@ export async function createLeaseAction(formData: FormData) {
     // Só cria parcela do mês atual se billing_start_date já chegou
     if (billingStartObj <= currentMonthStart) {
       const dueDate = calcDueDate(year, month, dueDay)
+
+      // Calcular o número da parcela correspondente a esse billingMonth
+      const startMonthObj = new Date(effectiveBillingStart + 'T00:00:00Z')
+      const currentMonthStartObj = new Date(billingMonth + 'T00:00:00Z')
+      const diffMonths = (currentMonthStartObj.getUTCFullYear() - startMonthObj.getUTCFullYear()) * 12 + (currentMonthStartObj.getUTCMonth() - startMonthObj.getUTCMonth())
+      const installmentNum = diffMonths + 1
+
+      // Achar o desconto correspondente
+      const matchedDiscount = discounts.find((d: any) => installmentNum >= d.start_installment && installmentNum <= d.end_installment)
+      const discountAmount = matchedDiscount ? parseFloat(matchedDiscount.discount_value) : 0
+
       await supabase.from('transactions').insert({
         user_id: user.id,
         lease_id: insertedLease.id,
         property_id: propertyId,
         type: 'income',
         amount: rentValue,
+        discount_amount: discountAmount,
         due_date: dueDate,
         billing_month: billingMonth, // C1: sempre dia 1 do mês
         status: 'pending'
@@ -298,6 +328,34 @@ export async function updateLeaseAction(formData: FormData) {
       .eq('user_id', user.id)
 
     if (error) return error.message
+
+    // Atualizar descontos se fornecido
+    if (formData.has('lease_discounts_json')) {
+      const leaseDiscountsRaw = formData.get('lease_discounts_json') as string || '[]'
+      const discounts = JSON.parse(leaseDiscountsRaw)
+
+      // Deletar anteriores
+      const { error: delErr } = await supabase
+        .from('lease_discounts')
+        .delete()
+        .eq('lease_id', id)
+
+      if (delErr) return delErr.message
+
+      // Inserir novos
+      if (discounts.length > 0) {
+        const { error: insErr } = await supabase.from('lease_discounts').insert(
+          discounts.map((d: any) => ({
+            lease_id: id,
+            user_id: user.id,
+            start_installment: parseInt(d.start_installment),
+            end_installment: parseInt(d.end_installment),
+            discount_value: parseFloat(d.discount_value)
+          }))
+        )
+        if (insErr) return insErr.message
+      }
+    }
 
     // billing_start_date via RPC própria — cancela parcelas pendentes anteriores se necessário
     if (billingStartDate !== undefined && billingStartDate !== null) {
@@ -574,12 +632,13 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
 
     if (!leaseRaw) return { error: 'Contrato não encontrado' }
 
-    const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
+    const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }, { data: discountsRaw }] = await Promise.all([
       supabase.from('properties').select('name, address, city, state, type').eq('id', leaseRaw.property_id).single(),
       supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', leaseRaw.tenant_id).single(),
       leaseRaw.landlord_profile_id
         ? supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('id', leaseRaw.landlord_profile_id).single()
         : supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
+      supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
     ])
 
     const tenant = tenantRaw as { name: string; email: string | null; document: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null } | null
@@ -600,6 +659,7 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
         phone:    ownerProfile?.phone    ?? null,
         address:  ownerProfile?.address  ?? null,
       },
+      discounts: discountsRaw ?? [],
     })
 
     const buffer = await generateContratoPdfBuffer(pdfData)
@@ -641,5 +701,21 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
     return { ok: true }
   } catch (err) {
     return { error: (err as Error).message || 'Erro ao enviar e-mail' }
+  }
+}
+
+export async function getLeaseDiscountsAction(leaseId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+    const { data } = await supabase
+      .from('lease_discounts')
+      .select('id, start_installment, end_installment, discount_value')
+      .eq('lease_id', leaseId)
+      .order('start_installment', { ascending: true })
+    return data ?? []
+  } catch {
+    return []
   }
 }

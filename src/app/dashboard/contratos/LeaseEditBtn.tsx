@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw } from 'lucide-react'
-import { updateLeaseAction, renewLeaseAction, getAdjustmentIndexAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction } from './actions'
+import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw, Trash2 } from 'lucide-react'
+import { updateLeaseAction, renewLeaseAction, getAdjustmentIndexAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction, getLeaseDiscountsAction } from './actions'
 
 interface Props {
   lease: {
@@ -36,6 +36,30 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
   const [indiceData, setIndiceData] = useState<{ pct: number; ref: string; source: string } | null>(null)
   const [indiceLoading, setIndiceLoading] = useState(false)
   const [indiceError, setIndiceError] = useState('')
+  const [discounts, setDiscounts] = useState<{ start_installment: number, end_installment: number, discount_value: number }[]>([])
+  const [discountsLoading, setDiscountsLoading] = useState(false)
+
+  const addDiscountRow = () => {
+    setDiscounts(prev => [...prev, { start_installment: 1, end_installment: 1, discount_value: 0 }])
+  }
+
+  const removeDiscountRow = (index: number) => {
+    setDiscounts(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateDiscountRow = (index: number, field: string, value: number) => {
+    setDiscounts(prev => prev.map((d, i) => i === index ? { ...d, [field]: value } : d))
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      setDiscountsLoading(true)
+      getLeaseDiscountsAction(lease.id).then(d => {
+        setDiscounts(d)
+        setDiscountsLoading(false)
+      })
+    }
+  }, [isOpen, lease.id])
 
   useEffect(() => {
     if (tab === 'documentos' && isOpen) {
@@ -344,6 +368,82 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                         <option value="LIVRE">Livre Acordo</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Descontos Escalonados */}
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '16px', marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <p style={{ color: 'var(--accent-color)', fontSize: '12px', fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Descontos Escalonados / Temporários
+                      </p>
+                      <button
+                        type="button"
+                        onClick={addDiscountRow}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', border: '1px solid rgba(99,102,241,0.2)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        <Plus size={12} style={{ display: 'inline' }} />
+                        Adicionar Faixa
+                      </button>
+                    </div>
+
+                    {discountsLoading ? (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '8px 0 0', textAlign: 'center' }}>
+                        Carregando descontos...
+                      </p>
+                    ) : discounts.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '8px 0 0', textAlign: 'center' }}>
+                        Nenhum desconto temporário cadastrado para este contrato.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                        {discounts.map((d, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr auto', gap: '10px', alignItems: 'center' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Parc. Inicial</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={d.start_installment}
+                                onChange={e => updateDiscountRow(idx, 'start_installment', parseInt(e.target.value) || 1)}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Parc. Final</label>
+                              <input
+                                type="number"
+                                min={d.start_installment}
+                                value={d.end_installment}
+                                onChange={e => updateDiscountRow(idx, 'end_installment', parseInt(e.target.value) || 1)}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Desconto (R$)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={d.discount_value || ''}
+                                onChange={e => updateDiscountRow(idx, 'discount_value', parseFloat(e.target.value) || 0)}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                              />
+                            </div>
+                            <div style={{ paddingTop: '16px' }}>
+                              <button
+                                type="button"
+                                onClick={() => removeDiscountRow(idx)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px' }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <input type="hidden" name="lease_discounts_json" value={JSON.stringify(discounts)} />
                   </div>
                 </>
               )}

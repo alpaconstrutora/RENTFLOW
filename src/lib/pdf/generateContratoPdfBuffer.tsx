@@ -4,6 +4,12 @@ import { valorPorExtenso, formatBRL, formatDate } from '../valorPorExtenso'
 
 export type GuaranteeType = 'fiador' | 'caucao' | 'seguro_fianca' | 'titulo_capitalizacao' | 'nenhuma'
 
+export interface ContratoPdfDiscount {
+  start_installment: number
+  end_installment: number
+  discount_value: number
+}
+
 export interface ContratoPdfData {
   contractNum: string
   owner: { name: string; document: string | null; phone: string | null; address: string | null }
@@ -26,6 +32,7 @@ export interface ContratoPdfData {
   iptuPaidBy: 'tenant' | 'landlord' | null
   condoPaidBy: 'tenant' | 'landlord' | null
   isCommercial: boolean
+  discounts?: ContratoPdfDiscount[]
 }
 
 const s = StyleSheet.create({
@@ -68,7 +75,7 @@ export async function generateContratoPdfBuffer(data: ContratoPdfData): Promise<
     contractNum, owner, tenant, property, propertyAddress, tenantAddress,
     rentValue, dueDay, endClause, adjustmentClause, cidadeData,
     guaranteeType, guarantorName, guarantorDocument,
-    iptuPaidBy, condoPaidBy, isCommercial,
+    iptuPaidBy, condoPaidBy, isCommercial, discounts,
   } = data
 
   const contractTitle = isCommercial
@@ -150,6 +157,18 @@ export async function generateContratoPdfBuffer(data: ContratoPdfData): Promise<
             <Text style={s.bold}>{String(dueDay).padStart(2, '0')}</Text> de cada mês,
             mediante transferência bancária ou outro meio acordado entre as partes.
           </Text>
+          {discounts && discounts.length > 0 ? (
+            <View style={{ marginTop: 6, marginBottom: 6 }}>
+              <Text style={{ ...s.para, fontFamily: 'Helvetica-Bold' }}>
+                Parágrafo Único — Fica pactuado um desconto temporário/escalonado no valor do aluguel conforme a seguir:
+              </Text>
+              {discounts.map((d, idx) => (
+                <Text key={idx} style={s.listItem}>
+                  • Desconto de {formatBRL(d.discount_value)} e parcelas líquidas de {formatBRL(rentValue - d.discount_value)} nas parcelas de {d.start_installment} a {d.end_installment}.
+                </Text>
+              ))}
+            </View>
+          ) : null}
           <Text style={s.para}>
             O não pagamento no prazo acarretará multa de 2% (dois por cento) sobre o valor em aberto,
             acrescida de juros moratórios de 1% (um por cento) ao mês e correção monetária pelo IGPM.
@@ -299,8 +318,9 @@ export function buildContratoPdfData(params: {
     guarantor_document: string | null
   } | null
   owner: { name: string; document: string | null; phone: string | null; address: string | null }
+  discounts?: ContratoPdfDiscount[]
 }): ContratoPdfData {
-  const { leaseId, lease, property, tenant, owner } = params
+  const { leaseId, lease, property, tenant, owner, discounts } = params
 
   const propertyAddress = [
     property?.address,
@@ -349,5 +369,6 @@ export function buildContratoPdfData(params: {
     iptuPaidBy: (lease.iptu_paid_by as 'tenant' | 'landlord' | null) ?? null,
     condoPaidBy: (lease.condo_paid_by as 'tenant' | 'landlord' | null) ?? null,
     isCommercial: property?.type === 'commercial',
+    discounts: discounts || [],
   }
 }

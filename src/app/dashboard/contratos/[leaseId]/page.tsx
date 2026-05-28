@@ -80,13 +80,16 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
 
   if (!lease) notFound()
 
-  const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
+  const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }, { data: discountsRaw }] = await Promise.all([
     supabase.from('properties').select('name, address, city, state, type').eq('id', lease.property_id).single(),
     supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', lease.tenant_id).single(),
     lease.landlord_profile_id
       ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', lease.landlord_profile_id).single()
       : supabase.from('landlord_profiles').select('name, document, phone, address').eq('is_default', true).maybeSingle(),
+    supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
   ])
+
+  const discounts = discountsRaw ?? []
 
   const property = propertyRaw as { name: string; address: string | null; city: string | null; state: string | null; type: string | null } | null
   const tenant = tenantRaw as { name: string; document: string | null; email: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null } | null
@@ -226,6 +229,20 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
             a ser pago até o dia <strong>{String(lease.due_day).padStart(2, '0')}</strong> de cada mês,
             mediante transferência bancária ou outro meio acordado entre as partes.
           </p>
+          {discounts && discounts.length > 0 && (
+            <div style={{ margin: '12px 0' }}>
+              <p style={{ ...pStyle, fontWeight: 600 }}>
+                Parágrafo Único — Fica pactuado um desconto temporário/escalonado no valor do aluguel conforme a seguir:
+              </p>
+              <ul style={{ fontSize: '14px', margin: '0 0 12px', paddingLeft: '20px', listStyleType: 'disc' }}>
+                {discounts.map((d, index) => (
+                  <li key={index} style={{ marginBottom: '4px' }}>
+                    Desconto de <strong>{formatBRL(d.discount_value)}</strong> e parcelas líquidas de <strong>{formatBRL(lease.rent_value - d.discount_value)}</strong> nas parcelas de {d.start_installment} a {d.end_installment}.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p style={{ fontSize: '14px', margin: 0 }}>
             O não pagamento no prazo acarretará multa de 2% (dois por cento) sobre o valor em aberto,
             acrescida de juros moratórios de 1% (um por cento) ao mês e correção monetária pelo IGPM.
