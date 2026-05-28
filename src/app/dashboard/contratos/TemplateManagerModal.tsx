@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, FileText, Upload, Plus, Trash2, CheckCircle2, ChevronRight, Settings } from 'lucide-react'
+import { X, FileText, Upload, Plus, Trash2, CheckCircle2, ChevronRight, Settings, Edit3 } from 'lucide-react'
 import Pizzip from 'pizzip'
 import styles from '../../page.module.css'
 import {
   getContractTemplatesAction,
   createContractTemplateAction,
   deleteContractTemplateAction,
-  uploadTemplateFileAction
+  uploadTemplateFileAction,
+  updateContractTemplateAction,
+  getTemplateVariablesAction
 } from './actions'
 
 interface Template {
@@ -37,6 +39,7 @@ export default function TemplateManagerModal() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
 
   // Form states
   const [templateName, setTemplateName] = useState('')
@@ -126,7 +129,9 @@ export default function TemplateManagerModal() {
 
     setErrorMsg('')
     setSelectedFile(file)
-    setTemplateName(file.name.replace(/\.docx$/i, ''))
+    if (!editingTemplateId || !templateName) {
+      setTemplateName(file.name.replace(/\.docx$/i, ''))
+    }
 
     const reader = new FileReader()
     reader.onload = (event) => {
@@ -176,10 +181,52 @@ export default function TemplateManagerModal() {
     setDetectedVariables(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v))
   }
 
+  const handleTabChange = (tab: 'list' | 'upload') => {
+    setActiveTab(tab)
+    setErrorMsg('')
+    setSuccessMsg('')
+    if (tab === 'list') {
+      setEditingTemplateId(null)
+      setTemplateName('')
+      setSelectedFile(null)
+      setDetectedVariables([])
+    }
+  }
+
+  const handleEditTemplateClick = async (t: Template) => {
+    setIsLoading(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+    setEditingTemplateId(t.id)
+    setTemplateName(t.name)
+    setCategory(t.category)
+    
+    try {
+      const vars = await getTemplateVariablesAction(t.id)
+      setDetectedVariables(vars.map((v: any) => ({
+        code: v.code,
+        label: v.label,
+        field_type: v.field_type,
+        is_required: v.is_required,
+        origin: v.origin,
+        default_value: v.default_value || ''
+      })))
+      setActiveTab('upload')
+    } catch (err: any) {
+      setErrorMsg(`Erro ao carregar variáveis: ${err.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleUploadAndSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedFile || !templateName) {
-      setErrorMsg('Preencha o nome do modelo e selecione o arquivo.')
+    if (!templateName) {
+      setErrorMsg('Preencha o nome do modelo.')
+      return
+    }
+    if (!editingTemplateId && !selectedFile) {
+      setErrorMsg('Por favor, selecione o arquivo do Word (.docx) para o novo modelo.')
       return
     }
 
@@ -188,49 +235,63 @@ export default function TemplateManagerModal() {
     setSuccessMsg('')
 
     try {
-      // 1. Converter arquivo para base64
-      const reader = new FileReader()
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          const result = reader.result as string
-          const base64 = result.split(',')[1]
-          resolve(base64)
+      let storagePath: string | null = null
+
+      if (selectedFile) {
+        // Converter arquivo para base64 e fazer upload
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = () => {
+            const result = reader.result as string
+            const base64 = result.split(',')[1]
+            resolve(base64)
+          }
+          reader.readAsDataURL(selectedFile)
+        })
+
+        const base64Data = await base64Promise
+
+        const uploadRes = await uploadTemplateFileAction(selectedFile.name, base64Data)
+        if ('error' in uploadRes) {
+          setErrorMsg(`Erro de upload: ${uploadRes.error}`)
+          setIsLoading(false)
+          return
         }
-        reader.readAsDataURL(selectedFile)
-      })
 
-      const base64Data = await base64Promise
-
-      // 2. Fazer upload para o Storage
-      const uploadRes = await uploadTemplateFileAction(selectedFile.name, base64Data)
-      if ('error' in uploadRes) {
-        setErrorMsg(`Erro de upload: ${uploadRes.error}`)
-        setIsLoading(false)
-        return
+        storagePath = uploadRes.storagePath!
       }
 
-      const storagePath = uploadRes.storagePath!
-
-      // 3. Salvar no Banco
-      const result = await createContractTemplateAction(
-        templateName,
-        category,
-        storagePath,
-        detectedVariables
-      )
+      let result
+      if (editingTemplateId) {
+        result = await updateContractTemplateAction(
+          editingTemplateId,
+          templateName,
+          category,
+          storagePath,
+          detectedVariables
+        )
+      } else {
+        result = await createContractTemplateAction(
+          templateName,
+          category,
+          storagePath!,
+          detectedVariables
+        )
+      }
 
       if (typeof result === 'string') {
         setErrorMsg(result)
       } else {
-        setSuccessMsg('Modelo e variáveis cadastrados com sucesso!')
+        setSuccessMsg(editingTemplateId ? 'Modelo jurídico atualizado com sucesso!' : 'Modelo e variáveis cadastrados com sucesso!')
         setTemplateName('')
+        setEditingTemplateId(null)
         setSelectedFile(null)
         setDetectedVariables([])
         setActiveTab('list')
         loadTemplates()
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Erro durante o cadastro.')
+      setErrorMsg(err.message || 'Erro durante o salvamento.')
     } finally {
       setIsLoading(false)
     }
@@ -312,7 +373,7 @@ export default function TemplateManagerModal() {
             <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', margin: '24px 0', gap: '20px' }}>
               <button
                 type="button"
-                onClick={() => { setActiveTab('list'); setErrorMsg(''); setSuccessMsg('') }}
+                onClick={() => handleTabChange('list')}
                 style={{
                   padding: '12px 6px',
                   color: activeTab === 'list' ? 'var(--accent-color)' : 'var(--text-secondary)',
@@ -326,7 +387,7 @@ export default function TemplateManagerModal() {
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveTab('upload'); setErrorMsg(''); setSuccessMsg('') }}
+                onClick={() => handleTabChange('upload')}
                 style={{
                   padding: '12px 6px',
                   color: activeTab === 'upload' ? 'var(--accent-color)' : 'var(--text-secondary)',
@@ -336,7 +397,7 @@ export default function TemplateManagerModal() {
                   transition: 'all 0.2s'
                 }}
               >
-                Subir Novo DOCX
+                {editingTemplateId ? 'Editar Modelo' : 'Subir Novo DOCX'}
               </button>
             </div>
 
@@ -382,16 +443,28 @@ export default function TemplateManagerModal() {
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Versão {t.version}</span>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={() => handleDeleteTemplate(t.id)}
-                          style={{ color: 'var(--danger-color)', padding: '8px', borderRadius: '8px', background: 'transparent', transition: 'all 0.2s', cursor: 'pointer' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-bg)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => handleEditTemplateClick(t)}
+                            style={{ color: 'var(--accent-color)', padding: '8px', borderRadius: '8px', background: 'transparent', transition: 'all 0.2s', cursor: 'pointer' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(74, 111, 255, 0.1)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => handleDeleteTemplate(t.id)}
+                            style={{ color: 'var(--danger-color)', padding: '8px', borderRadius: '8px', background: 'transparent', transition: 'all 0.2s', cursor: 'pointer' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-bg)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -432,8 +505,16 @@ export default function TemplateManagerModal() {
                 {/* File Dropzone */}
                 <div 
                   style={{ 
-                    border: selectedFile ? '1px solid rgba(0, 229, 155, 0.3)' : '1px dashed rgba(255,255,255,0.15)',
-                    background: selectedFile ? 'rgba(0, 229, 155, 0.02)' : 'rgba(255,255,255,0.01)',
+                    border: selectedFile 
+                      ? '1px solid rgba(0, 229, 155, 0.3)' 
+                      : editingTemplateId 
+                        ? '1px dashed rgba(74, 111, 255, 0.3)' 
+                        : '1px dashed rgba(255,255,255,0.15)',
+                    background: selectedFile 
+                      ? 'rgba(0, 229, 155, 0.02)' 
+                      : editingTemplateId 
+                        ? 'rgba(74, 111, 255, 0.02)' 
+                        : 'rgba(255,255,255,0.01)',
                     borderRadius: '16px',
                     padding: '32px',
                     textAlign: 'center',
@@ -448,11 +529,26 @@ export default function TemplateManagerModal() {
                     onChange={handleFileChange}
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                   />
-                  <Upload size={32} style={{ color: selectedFile ? 'var(--success-color)' : 'var(--text-muted)', marginBottom: '12px' }} />
+                  <Upload 
+                    size={32} 
+                    style={{ 
+                      color: selectedFile 
+                        ? 'var(--success-color)' 
+                        : editingTemplateId 
+                          ? 'var(--accent-color)' 
+                          : 'var(--text-muted)', 
+                      marginBottom: '12px' 
+                    }} 
+                  />
                   {selectedFile ? (
                     <div>
                       <p style={{ color: 'white', fontWeight: 600, margin: '0 0 4px 0', fontSize: '14px' }}>Arquivo carregado com sucesso!</p>
                       <p style={{ color: 'var(--success-color)', fontSize: '12px', margin: 0, fontWeight: 500 }}>{selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)</p>
+                    </div>
+                  ) : editingTemplateId ? (
+                    <div>
+                      <p style={{ color: 'white', fontWeight: 600, margin: '0 0 4px 0', fontSize: '14px' }}>Documento DOCX atual preservado</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '11px', margin: 0 }}>Arraste ou selecione um novo arquivo se desejar substituir o documento atual.</p>
                     </div>
                   ) : (
                     <div>
@@ -563,14 +659,14 @@ export default function TemplateManagerModal() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '32px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px' }}>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('list')}
+                    onClick={() => handleTabChange('list')}
                     style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={isLoading || !selectedFile}
+                    disabled={isLoading || (!editingTemplateId && !selectedFile)}
                     style={{
                       padding: '14px 28px',
                       borderRadius: '12px',
@@ -579,7 +675,7 @@ export default function TemplateManagerModal() {
                       color: 'var(--success-color)',
                       fontWeight: 'bold',
                       cursor: 'pointer',
-                      opacity: (isLoading || !selectedFile) ? 0.3 : 1,
+                      opacity: (isLoading || (!editingTemplateId && !selectedFile)) ? 0.3 : 1,
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',

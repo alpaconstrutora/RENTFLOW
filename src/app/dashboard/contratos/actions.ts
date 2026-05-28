@@ -1008,4 +1008,64 @@ export async function generateContractInstanceAction(
   }
 }
 
+export async function updateContractTemplateAction(
+  id: string,
+  name: string,
+  category: string,
+  docxStoragePath: string | null,
+  variables: any[]
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return "Erro de Autenticação."
+
+    const updatePayload: Record<string, any> = { name, category }
+    if (docxStoragePath) {
+      updatePayload.docx_storage_path = docxStoragePath
+    }
+
+    const { error: tErr } = await supabase
+      .from('contract_templates')
+      .update(updatePayload)
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (tErr) return tErr.message
+
+    const { error: dErr } = await supabase
+      .from('contract_variables')
+      .delete()
+      .eq('template_id', id)
+
+    if (dErr) return dErr.message
+
+    if (variables && variables.length > 0) {
+      const formattedVars = variables.map(v => ({
+        template_id: id,
+        code: v.code,
+        label: v.label || v.code,
+        field_type: v.field_type || 'text',
+        is_required: v.is_required !== undefined ? v.is_required : true,
+        origin: v.origin || 'manual',
+        default_value: v.default_value || null,
+        validation_regex: v.validation_regex || null,
+        tooltip_help: v.tooltip_help || null
+      }))
+
+      const { error: vErr } = await supabase
+        .from('contract_variables')
+        .insert(formattedVars)
+
+      if (vErr) return vErr.message
+    }
+
+    revalidatePath('/dashboard/contratos')
+    return null
+  } catch (err: any) {
+    return err.message || "Erro ao atualizar template"
+  }
+}
+
+
 
