@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw, Trash2 } from 'lucide-react'
+import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw, Trash2, Plus } from 'lucide-react'
 import { updateLeaseAction, renewLeaseAction, getAdjustmentIndexAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction, getLeaseDiscountsAction } from './actions'
 
 interface Props {
