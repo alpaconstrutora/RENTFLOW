@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { createClient } from '../../../../utils/supabase/server'
 import PrintBtn from './PrintBtn'
 import SendContractEmailBtn from './SendContractEmailBtn'
+import { FileText, Download, CheckCircle, ChevronDown } from 'lucide-react'
+import styles from '../../../page.module.css'
 
 function formatDate(d: string | null) {
   if (!d) return '—'
@@ -80,14 +82,43 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
 
   if (!lease) notFound()
 
-  const [{ data: propertyRaw }, { data: tenantRaw }, { data: landlordProfileRaw }, { data: discountsRaw }] = await Promise.all([
+  const [
+    { data: propertyRaw },
+    { data: tenantRaw },
+    { data: landlordProfileRaw },
+    { data: discountsRaw },
+    { data: instanceRaw }
+  ] = await Promise.all([
     supabase.from('properties').select('name, address, city, state, type').eq('id', lease.property_id).single(),
     supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', lease.tenant_id).single(),
     lease.landlord_profile_id
       ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', lease.landlord_profile_id).single()
       : supabase.from('landlord_profiles').select('name, document, phone, address').eq('is_default', true).maybeSingle(),
     supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
+    supabase.from('contract_instances')
+      .select('id, generated_docx_path, generated_pdf_path, sha256_hash, created_at, template:contract_templates(name, version)')
+      .eq('lease_id', leaseId)
+      .eq('status', 'ready')
+      .maybeSingle()
   ])
+
+  let variableValues: any[] = []
+  let downloadUrl: string | null = null
+
+  if (instanceRaw) {
+    const { data: vals } = await supabase
+      .from('contract_variable_values')
+      .select('value, variable:contract_variables(code, label)')
+      .eq('instance_id', instanceRaw.id)
+    variableValues = vals ?? []
+
+    if (instanceRaw.generated_docx_path) {
+      const { data: signedData } = await supabase.storage
+        .from('lease-documents')
+        .createSignedUrl(instanceRaw.generated_docx_path, 3600)
+      if (signedData) downloadUrl = signedData.signedUrl
+    }
+  }
 
   const discounts = discountsRaw ?? []
 
@@ -166,6 +197,171 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
           ← Voltar aos Contratos
         </a>
       </div>
+
+      {instanceRaw && (
+        <div className="print-hide" style={{ 
+          background: 'rgba(25, 28, 38, 0.6)', 
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(74, 111, 255, 0.15)', 
+          padding: '24px', 
+          borderRadius: '16px', 
+          marginBottom: '28px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          maxWidth: '760px',
+          margin: '0 auto 28px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                width: '42px', 
+                height: '42px', 
+                background: 'rgba(74, 111, 255, 0.1)', 
+                border: '1px solid rgba(74, 111, 255, 0.2)', 
+                borderRadius: '10px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                color: 'var(--accent-color)'
+              }}>
+                <CheckCircle size={20} />
+              </div>
+              <div>
+                <span style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 700, 
+                  color: 'var(--accent-color)', 
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  display: 'block',
+                  marginBottom: '2px'
+                }}>
+                  Contrato Emitido via Modelo Salvo
+                </span>
+                <h2 style={{ fontSize: '18px', color: 'white', margin: 0, fontWeight: 600 }}>
+                  Minuta Oficial DOCX Gerada
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', marginTop: '2px' }}>
+                  Baseada no modelo: <strong style={{ color: 'white' }}>{(instanceRaw.template as any)?.name}</strong> (v{(instanceRaw.template as any)?.version})
+                </p>
+              </div>
+            </div>
+            
+            {downloadUrl && (
+              <a 
+                href={downloadUrl}
+                download
+                className={styles.btnPrimary}
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  cursor: 'pointer', 
+                  border: 'none',
+                  background: 'var(--success-bg)',
+                  color: 'var(--success-color)',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  textDecoration: 'none',
+                  boxShadow: '0 4px 12px rgba(0, 229, 155, 0.15)',
+                  transition: 'transform 0.2s'
+                }}
+              >
+                <Download size={15} />
+                Baixar DOCX Oficial Preenchido
+              </a>
+            )}
+          </div>
+          
+          <div style={{ 
+            borderTop: '1px solid rgba(255,255,255,0.06)', 
+            paddingTop: '16px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '24px'
+          }}>
+            <div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                Integridade Digital (SHA-256)
+              </span>
+              <span style={{ 
+                fontSize: '11px', 
+                fontFamily: 'monospace', 
+                color: 'var(--text-secondary)', 
+                wordBreak: 'break-all',
+                background: 'rgba(0,0,0,0.2)',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                display: 'block',
+                border: '1px solid rgba(255,255,255,0.03)'
+              }}>
+                {instanceRaw.sha256_hash || '—'}
+              </span>
+            </div>
+            <div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                Data de Geração Física
+              </span>
+              <span style={{ fontSize: '12px', color: 'white', fontWeight: 500, display: 'block', paddingTop: '4px' }}>
+                {new Date(instanceRaw.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          </div>
+
+          {variableValues.length > 0 && (
+            <details style={{ 
+              background: 'rgba(0,0,0,0.15)', 
+              border: '1px solid rgba(255,255,255,0.04)', 
+              borderRadius: '8px', 
+              padding: '12px 16px',
+              marginTop: '4px'
+            }}>
+              <summary style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', userSelect: 'none' }}>
+                <ChevronDown size={14} style={{ transition: 'transform 0.2s' }} />
+                Visualizar Campos & Variáveis Substituídas no DOCX ({variableValues.length})
+              </summary>
+              <div style={{ 
+                marginTop: '12px', 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '8px 16px', 
+                maxHeight: '180px', 
+                overflowY: 'auto',
+                paddingRight: '6px'
+              }}>
+                {variableValues.map((v: any, idx: number) => (
+                  <div key={idx} style={{ 
+                    background: 'rgba(255,255,255,0.02)', 
+                    padding: '8px 12px', 
+                    borderRadius: '6px', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    gap: '2px',
+                    fontSize: '11px',
+                    border: '1px solid rgba(255,255,255,0.02)'
+                  }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                      {v.variable?.label || v.variable?.code || 'Campo'}
+                    </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--accent-color)', fontFamily: 'monospace', fontSize: '10px' }}>
+                        {`{{${v.variable?.code}}}`}
+                      </span>
+                      <span style={{ color: 'white', fontWeight: 500 }}>
+                        {v.value}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       <div className="contract-box" style={{
         maxWidth: '760px', margin: '0 auto', background: 'white', color: '#1a1a1a',
