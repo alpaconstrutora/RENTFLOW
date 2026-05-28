@@ -104,14 +104,14 @@ export default function TemplateManagerModal() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!file.name.endsWith('.docx')) {
+    if (!file.name.toLowerCase().endsWith('.docx')) {
       setErrorMsg('Por favor, selecione apenas arquivos do Microsoft Word (.docx).')
       return
     }
 
     setErrorMsg('')
     setSelectedFile(file)
-    setTemplateName(file.name.replace('.docx', ''))
+    setTemplateName(file.name.replace(/\.docx$/i, ''))
 
     const reader = new FileReader()
     reader.onload = (event) => {
