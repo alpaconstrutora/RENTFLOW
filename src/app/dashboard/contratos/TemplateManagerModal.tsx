@@ -120,16 +120,20 @@ export default function TemplateManagerModal() {
         const zip = new Pizzip(arrayBuffer)
         const docXml = zip.files['word/document.xml'].asText()
 
+        // Remove ALL XML tags to flatten the document content and get pure text.
+        // This solves the classic Word split run issue (spelling check, font changes, formatting splits).
+        const cleanText = docXml.replace(/<[^>]+>/g, '')
+
         const handlebarsRegex = /\{\{([^}]+)\}\}/g
         const legacyRegex = /##P\{([^}]+)\}##/g
         const variables = new Set<string>()
         let match
 
-        while ((match = handlebarsRegex.exec(docXml)) !== null) {
+        while ((match = handlebarsRegex.exec(cleanText)) !== null) {
           variables.add(match[1].trim())
         }
 
-        while ((match = legacyRegex.exec(docXml)) !== null) {
+        while ((match = legacyRegex.exec(cleanText)) !== null) {
           variables.add(match[1].trim())
         }
 
