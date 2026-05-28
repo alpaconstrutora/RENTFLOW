@@ -24,9 +24,22 @@ export async function GET(
     supabase.from('properties').select('name, address, city, state, type').eq('id', lease.property_id).single(),
     supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', lease.tenant_id).single(),
     lease.landlord_profile_id
-      ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', lease.landlord_profile_id).single()
-      : supabase.from('landlord_profiles').select('name, document, phone, address').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
+      ? supabase.from('landlord_profiles').select('id, name, document, phone, address').eq('id', lease.landlord_profile_id).single()
+      : supabase.from('landlord_profiles').select('id, name, document, phone, address').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
   ])
+
+  const landlordProfileId = lease.landlord_profile_id || (landlordProfileRaw as { id?: string } | null)?.id || null
+  let bankAccount = null
+  if (landlordProfileId) {
+    const { data: bankAccRaw } = await supabase
+      .from('bank_accounts')
+      .select('bank_name, bank_code, branch, branch_digit, account, account_digit, account_type, holder_name, holder_document, pix_key, pix_key_type')
+      .eq('landlord_profile_id', landlordProfileId)
+      .eq('is_main_account', true)
+      .eq('is_active', true)
+      .maybeSingle()
+    bankAccount = bankAccRaw
+  }
 
   const meta = user.user_metadata as { name?: string; phone?: string; document?: string; address?: string }
   const ownerProfile = landlordProfileRaw as { name: string; document: string | null; phone: string | null; address: string | null } | null
@@ -42,6 +55,7 @@ export async function GET(
       phone:    ownerProfile?.phone    ?? meta.phone    ?? null,
       address:  ownerProfile?.address  ?? meta.address  ?? null,
     },
+    bankAccount: bankAccount as Parameters<typeof buildContratoPdfData>[0]['bankAccount']
   })
 
   const buffer = await generateContratoPdfBuffer(pdfData)

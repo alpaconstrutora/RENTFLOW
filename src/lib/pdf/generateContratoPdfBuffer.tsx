@@ -10,6 +10,20 @@ export interface ContratoPdfDiscount {
   discount_value: number
 }
 
+export interface ContratoPdfBankAccount {
+  bank_name: string
+  bank_code: string
+  branch: string
+  branch_digit: string | null
+  account: string
+  account_digit: string | null
+  account_type: 'checking' | 'savings' | 'payment'
+  holder_name: string
+  holder_document: string
+  pix_key: string | null
+  pix_key_type: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | null
+}
+
 export interface ContratoPdfData {
   contractNum: string
   owner: { name: string; document: string | null; phone: string | null; address: string | null }
@@ -33,6 +47,7 @@ export interface ContratoPdfData {
   condoPaidBy: 'tenant' | 'landlord' | null
   isCommercial: boolean
   discounts?: ContratoPdfDiscount[]
+  bankAccount?: ContratoPdfBankAccount | null
 }
 
 const s = StyleSheet.create({
@@ -75,7 +90,7 @@ export async function generateContratoPdfBuffer(data: ContratoPdfData): Promise<
     contractNum, owner, tenant, property, propertyAddress, tenantAddress,
     rentValue, dueDay, endClause, adjustmentClause, cidadeData,
     guaranteeType, guarantorName, guarantorDocument,
-    iptuPaidBy, condoPaidBy, isCommercial, discounts,
+    iptuPaidBy, condoPaidBy, isCommercial, discounts, bankAccount,
   } = data
 
   const contractTitle = isCommercial
@@ -157,6 +172,24 @@ export async function generateContratoPdfBuffer(data: ContratoPdfData): Promise<
             <Text style={s.bold}>{String(dueDay).padStart(2, '0')}</Text> de cada mês,
             mediante transferência bancária ou outro meio acordado entre as partes.
           </Text>
+          {bankAccount ? (
+            <View style={{ marginTop: 6, marginBottom: 8, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 6, borderWidth: 1, borderColor: '#e0e0e0', borderStyle: 'solid' }}>
+              <Text style={{ ...s.para, fontFamily: 'Helvetica-Bold', fontSize: 9, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1, color: '#444' }}>
+                Dados Bancários para Depósito/Repasse:
+              </Text>
+              <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                <Text style={s.bold}>Favorecido: </Text>{bankAccount.holder_name} (CPF/CNPJ: {bankAccount.holder_document})
+              </Text>
+              <Text style={{ fontSize: 9, marginBottom: 2 }}>
+                <Text style={s.bold}>Banco: </Text>{bankAccount.bank_name} ({bankAccount.bank_code}) · Agência: {bankAccount.branch}{bankAccount.branch_digit ? `-${bankAccount.branch_digit}` : ''} · Conta {bankAccount.account_type === 'checking' ? 'Corrente' : bankAccount.account_type === 'savings' ? 'Poupança' : 'de Pagamento'}: {bankAccount.account}{bankAccount.account_digit ? `-${bankAccount.account_digit}` : ''}
+              </Text>
+              {bankAccount.pix_key ? (
+                <Text style={{ fontSize: 9, marginTop: 2 }}>
+                  <Text style={s.bold}>Chave PIX ({bankAccount.pix_key_type?.toUpperCase()}): </Text>{bankAccount.pix_key}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           {discounts && discounts.length > 0 ? (
             <View style={{ marginTop: 6, marginBottom: 6 }}>
               <Text style={{ ...s.para, fontFamily: 'Helvetica-Bold' }}>
@@ -319,8 +352,9 @@ export function buildContratoPdfData(params: {
   } | null
   owner: { name: string; document: string | null; phone: string | null; address: string | null }
   discounts?: ContratoPdfDiscount[]
+  bankAccount?: ContratoPdfBankAccount | null
 }): ContratoPdfData {
-  const { leaseId, lease, property, tenant, owner, discounts } = params
+  const { leaseId, lease, property, tenant, owner, discounts, bankAccount } = params
 
   const propertyAddress = [
     property?.address,
@@ -370,5 +404,6 @@ export function buildContratoPdfData(params: {
     condoPaidBy: (lease.condo_paid_by as 'tenant' | 'landlord' | null) ?? null,
     isCommercial: property?.type === 'commercial',
     discounts: discounts || [],
+    bankAccount: bankAccount || null,
   }
 }

@@ -6,6 +6,8 @@ import LeaseEditBtn from './LeaseEditBtn'
 import LeaseDeleteBtn from './LeaseDeleteBtn'
 import DistratoBtn from './DistratoBtn'
 import RunBillingBtn from './RunBillingBtn'
+import TemplateManagerModal from './TemplateManagerModal'
+import DynamicLeaseWizardModal from './DynamicLeaseWizardModal'
 
 interface LeaseRow {
   id: string
@@ -88,7 +90,9 @@ export default async function ContratosPage() {
           <p className={styles.subtitle}>Supervisione os contratos. Acione manualmente a automação (RPA) para faturar todo portfólio no mês vigente.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <TemplateManagerModal />
           <RunBillingBtn />
+          <DynamicLeaseWizardModal properties={properties} tenants={tenants} landlordProfiles={landlordProfiles} />
           <LeaseButtonWithModal properties={properties} tenants={tenants} landlordProfiles={landlordProfiles} />
         </div>
       </header>

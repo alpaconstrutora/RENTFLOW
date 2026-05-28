@@ -7,6 +7,8 @@ import { generateContratoPdfBuffer, buildContratoPdfData } from '../../../lib/pd
 import { formatBRL } from '../../../lib/valorPorExtenso'
 import { getAdjustmentIndex } from '../../../lib/fiscal/indices'
 import { getResend, FROM_EMAIL } from '../../../lib/email/client'
+import Pizzip from 'pizzip'
+import Docxtemplater from 'docxtemplater'
 
 async function saveLeaseSnapshot(
   supabase: SupabaseClient,
@@ -38,9 +40,22 @@ async function saveLeaseSnapshot(
     const [{ data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
       supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', leaseFullRaw.tenant_id).single(),
       leaseFullRaw.landlord_profile_id
-        ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', leaseFullRaw.landlord_profile_id).single()
-        : supabase.from('landlord_profiles').select('name, document, phone, address').eq('user_id', userId).eq('is_default', true).maybeSingle(),
+        ? supabase.from('landlord_profiles').select('id, name, document, phone, address').eq('id', leaseFullRaw.landlord_profile_id).single()
+        : supabase.from('landlord_profiles').select('id, name, document, phone, address').eq('user_id', userId).eq('is_default', true).maybeSingle(),
     ])
+
+    const landlordProfileId = leaseFullRaw.landlord_profile_id || (landlordProfileRaw as { id?: string } | null)?.id || null
+    let bankAccount = null
+    if (landlordProfileId) {
+      const { data: bankAccRaw } = await supabase
+        .from('bank_accounts')
+        .select('bank_name, bank_code, branch, branch_digit, account, account_digit, account_type, holder_name, holder_document, pix_key, pix_key_type')
+        .eq('landlord_profile_id', landlordProfileId)
+        .eq('is_main_account', true)
+        .eq('is_active', true)
+        .maybeSingle()
+      bankAccount = bankAccRaw
+    }
 
     const property = (propertyRaw as { properties: unknown })?.properties as Parameters<typeof buildContratoPdfData>[0]['property']
     const userEmail = userRes.data.user?.email ?? '—'
@@ -57,7 +72,8 @@ async function saveLeaseSnapshot(
       property,
       tenant: tenantRaw as Parameters<typeof buildContratoPdfData>[0]['tenant'],
       owner: ownerData,
-      discounts: discountsRaw ?? []
+      discounts: discountsRaw ?? [],
+      bankAccount: bankAccount as Parameters<typeof buildContratoPdfData>[0]['bankAccount']
     })
 
     const buffer = await generateContratoPdfBuffer(pdfData)
@@ -245,7 +261,7 @@ export async function createLeaseAction(formData: FormData) {
     revalidatePath('/dashboard')
     revalidatePath('/dashboard/fluxo')
     await saveLeaseSnapshot(supabase, insertedLease.id, user.id, `Contrato inicial — ${new Date().toLocaleDateString('pt-BR')}`)
-    return null
+    return { leaseId: insertedLease.id }
   } catch (err) {
     return (err as Error).message || "Erro de integridade do Banco."
   }
@@ -636,10 +652,23 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
       supabase.from('properties').select('name, address, city, state, type').eq('id', leaseRaw.property_id).single(),
       supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', leaseRaw.tenant_id).single(),
       leaseRaw.landlord_profile_id
-        ? supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('id', leaseRaw.landlord_profile_id).single()
-        : supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
+        ? supabase.from('landlord_profiles').select('id, name, document, phone, address, email').eq('id', leaseRaw.landlord_profile_id).single()
+        : supabase.from('landlord_profiles').select('id, name, document, phone, address, email').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
       supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
     ])
+
+    const landlordProfileId = leaseRaw.landlord_profile_id || (landlordProfileRaw as { id?: string } | null)?.id || null
+    let bankAccount = null
+    if (landlordProfileId) {
+      const { data: bankAccRaw } = await supabase
+        .from('bank_accounts')
+        .select('bank_name, bank_code, branch, branch_digit, account, account_digit, account_type, holder_name, holder_document, pix_key, pix_key_type')
+        .eq('landlord_profile_id', landlordProfileId)
+        .eq('is_main_account', true)
+        .eq('is_active', true)
+        .maybeSingle()
+      bankAccount = bankAccRaw
+    }
 
     const tenant = tenantRaw as { name: string; email: string | null; document: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null } | null
 
@@ -660,6 +689,7 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
         address:  ownerProfile?.address  ?? null,
       },
       discounts: discountsRaw ?? [],
+      bankAccount: bankAccount as Parameters<typeof buildContratoPdfData>[0]['bankAccount']
     })
 
     const buffer = await generateContratoPdfBuffer(pdfData)
@@ -719,3 +749,263 @@ export async function getLeaseDiscountsAction(leaseId: string) {
     return []
   }
 }
+
+export async function getContractTemplatesAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data } = await supabase
+    .from('contract_templates')
+    .select('id, name, category, docx_storage_path, status, version, metadata, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+  return data ?? []
+}
+
+export async function createContractTemplateAction(
+  name: string,
+  category: string,
+  docxStoragePath: string,
+  variables: any[]
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return "Erro de Autenticação."
+
+    const { data: template, error: tErr } = await supabase
+      .from('contract_templates')
+      .insert({
+        user_id: user.id,
+        name,
+        category,
+        docx_storage_path: docxStoragePath,
+        status: 'active',
+        version: '1.0.0'
+      })
+      .select('id')
+      .single()
+
+    if (tErr) return tErr.message
+
+    if (variables && variables.length > 0) {
+      const formattedVars = variables.map(v => ({
+        template_id: template.id,
+        code: v.code,
+        label: v.label || v.code,
+        field_type: v.field_type || 'text',
+        is_required: v.is_required !== undefined ? v.is_required : true,
+        origin: v.origin || 'manual',
+        default_value: v.default_value || null,
+        validation_regex: v.validation_regex || null,
+        tooltip_help: v.tooltip_help || null
+      }))
+
+      const { error: vErr } = await supabase
+        .from('contract_variables')
+        .insert(formattedVars)
+
+      if (vErr) {
+        await supabase.from('contract_templates').delete().eq('id', template.id)
+        return vErr.message
+      }
+    }
+
+    revalidatePath('/dashboard/contratos')
+    return { id: template.id }
+  } catch (err: any) {
+    return err.message || "Erro ao salvar template"
+  }
+}
+
+export async function deleteContractTemplateAction(id: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return "Erro de Autenticação."
+
+    const { count, error: countErr } = await supabase
+      .from('contract_instances')
+      .select('*', { count: 'exact', head: true })
+      .eq('template_id', id)
+
+    if (countErr) return countErr.message
+    if (count && count > 0) {
+      return "Este modelo não pode ser deletado porque já foi utilizado na geração de contratos. Você pode arquivá-lo."
+    }
+
+    const { error } = await supabase
+      .from('contract_templates')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (error) return error.message
+
+    revalidatePath('/dashboard/contratos')
+    return null
+  } catch (err: any) {
+    return err.message || "Erro ao excluir template"
+  }
+}
+
+export async function getTemplateVariablesAction(templateId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data } = await supabase
+      .from('contract_variables')
+      .select('id, template_id, code, label, field_type, is_required, origin, default_value, validation_regex, tooltip_help')
+      .eq('template_id', templateId)
+      .order('code', { ascending: true })
+
+    return data ?? []
+  } catch {
+    return []
+  }
+}
+
+export async function uploadTemplateFileAction(fileName: string, base64Data: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Erro de Autenticação." }
+
+    const buffer = Buffer.from(base64Data, 'base64')
+    const fileExtension = fileName.split('.').pop()
+    const storagePath = `${user.id}/templates/${Date.now()}_template.${fileExtension}`
+
+    const { error } = await supabase.storage
+      .from('lease-documents')
+      .upload(storagePath, buffer, {
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        upsert: true
+      })
+
+    if (error) return { error: error.message }
+    return { storagePath }
+  } catch (err: any) {
+    return { error: err.message || "Erro no upload do arquivo" }
+  }
+}
+
+export async function generateContractInstanceAction(
+  templateId: string,
+  leaseId: string,
+  variableValues: Record<string, string>
+) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Acesso não autorizado.")
+
+    const { data: template } = await supabase
+      .from('contract_templates')
+      .select('docx_storage_path')
+      .eq('id', templateId)
+      .single()
+
+    if (!template) throw new Error("Template não localizado.")
+
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('lease-documents')
+      .download(template.docx_storage_path)
+
+    if (downloadError || !fileData) {
+      throw new Error(`Erro ao baixar template: ${downloadError?.message}`)
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer()
+    const zip = new Pizzip(arrayBuffer)
+    
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true
+    })
+
+    doc.render(variableValues)
+
+    const generatedZipBuffer = doc.getZip().generate({
+      type: 'nodebuffer',
+      compression: 'DEFLATE'
+    })
+
+    const { data: lease } = await supabase
+      .from('leases')
+      .select('property_id, tenant_id')
+      .eq('id', leaseId)
+      .single()
+
+    const { data: instance, error: instanceError } = await supabase
+      .from('contract_instances')
+      .insert({
+        template_id: templateId,
+        user_id: user.id,
+        lease_id: leaseId,
+        property_id: lease?.property_id || null,
+        tenant_id: lease?.tenant_id || null,
+        status: 'ready'
+      })
+      .select('id')
+      .single()
+
+    if (instanceError) throw new Error(instanceError.message)
+
+    const docxPath = `${user.id}/leases/${leaseId}/${instance.id}_contrato.docx`
+    await supabase.storage
+      .from('lease-documents')
+      .upload(docxPath, generatedZipBuffer, {
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        upsert: true
+      })
+
+    const pdfPath = `${user.id}/leases/${leaseId}/${instance.id}_contrato.pdf`
+    const mockPdfBuffer = Buffer.from("PDF SIMULADO - MOTOR DE TEMPLATES JURIDICOS RENTFLOW")
+    await supabase.storage
+      .from('lease-documents')
+      .upload(pdfPath, mockPdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      })
+
+    const crypto = await import('crypto')
+    const sha256Hash = crypto.createHash('sha256').update(generatedZipBuffer).digest('hex')
+
+    await supabase
+      .from('contract_instances')
+      .update({
+        generated_docx_path: docxPath,
+        generated_pdf_path: pdfPath,
+        sha256_hash: sha256Hash
+      })
+      .eq('id', instance.id)
+
+    const { data: variables } = await supabase
+      .from('contract_variables')
+      .select('id, code')
+      .eq('template_id', templateId)
+
+    if (variables && variables.length > 0) {
+      const valueEntries = variables
+        .filter(v => variableValues[v.code] !== undefined)
+        .map(v => ({
+          instance_id: instance.id,
+          variable_id: v.id,
+          value: variableValues[v.code]
+        }))
+
+      if (valueEntries.length > 0) {
+        await supabase.from('contract_variable_values').insert(valueEntries)
+      }
+    }
+
+    revalidatePath('/dashboard/contratos')
+    return { success: true, instanceId: instance.id }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro na geração do contrato dinâmico" }
+  }
+}
+
+
