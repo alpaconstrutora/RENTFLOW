@@ -8,7 +8,7 @@ import { createLeaseAction, getContractTemplatesAction, getTemplateVariablesActi
 interface Props {
   properties: { id: string; name: string; status: string; address?: string | null; city?: string | null; state?: string | null }[]
   tenants: { id: string; name: string; document?: string | null; email?: string | null; phone?: string | null }[]
-  landlordProfiles: { id: string; name: string; person_type: string; document: string | null; is_default: boolean }[]
+  landlordProfiles: { id: string; name: string; person_type: string; document: string | null; is_default: boolean; email?: string | null; phone?: string | null; address?: string | null }[]
 }
 
 interface Template {
@@ -105,6 +105,21 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
           break
         case 'db_tenant_phone':
           resolvedValue = tenant?.phone || ''
+          break
+        case 'db_landlord_name':
+          resolvedValue = profile?.name || ''
+          break
+        case 'db_landlord_document':
+          resolvedValue = profile?.document || ''
+          break
+        case 'db_landlord_email':
+          resolvedValue = profile?.email || ''
+          break
+        case 'db_landlord_phone':
+          resolvedValue = profile?.phone || ''
+          break
+        case 'db_landlord_address':
+          resolvedValue = profile?.address || ''
           break
         case 'db_property_name':
           resolvedValue = property?.name || ''

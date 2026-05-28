@@ -72,7 +72,7 @@ export default async function ContratosPage() {
       .limit(200),
     supabase.from('properties').select('id, name, status').limit(200),
     supabase.from('tenants').select('id, name').limit(200),
-    supabase.from('landlord_profiles').select('id, name, person_type, document, is_default').order('is_default', { ascending: false }).order('name').limit(50),
+    supabase.from('landlord_profiles').select('id, name, person_type, document, is_default, email, phone, address').order('is_default', { ascending: false }).order('name').limit(50),
   ])
   const leases = leasesRaw as LeaseRow[] | null
 

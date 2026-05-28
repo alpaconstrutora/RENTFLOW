@@ -64,20 +64,35 @@ export default function TemplateManagerModal() {
     if (clean.includes('LOCATARIO_NOME') || (clean.includes('LOCATARIO') && clean.includes('NOME'))) {
       return { origin: 'db_tenant_name', label: 'Nome do Locatário', field_type: 'text' }
     }
+    if (clean.includes('LOCADOR_NOME') || (clean.includes('LOCADOR') && clean.includes('NOME')) || clean.includes('PROPRIETARIO_NOME')) {
+      return { origin: 'db_landlord_name', label: 'Nome do Locador', field_type: 'text' }
+    }
     if (clean.includes('LOCATARIO_DOCUMENTO') || clean.includes('LOCATARIO_CPF') || clean.includes('LOCATARIO_CNPJ') || (clean.includes('LOCATARIO') && clean.includes('DOC'))) {
       return { origin: 'db_tenant_document', label: 'CPF/CNPJ do Locatário', field_type: 'cpf_cnpj' }
+    }
+    if (clean.includes('LOCADOR_DOCUMENTO') || clean.includes('LOCADOR_CPF') || clean.includes('LOCADOR_CNPJ') || (clean.includes('LOCADOR') && clean.includes('DOC'))) {
+      return { origin: 'db_landlord_document', label: 'CPF/CNPJ do Locador', field_type: 'cpf_cnpj' }
     }
     if (clean.includes('LOCATARIO_EMAIL') || (clean.includes('LOCATARIO') && clean.includes('EMAIL'))) {
       return { origin: 'db_tenant_email', label: 'E-mail do Locatário', field_type: 'email' }
     }
+    if (clean.includes('LOCADOR_EMAIL') || (clean.includes('LOCADOR') && clean.includes('EMAIL'))) {
+      return { origin: 'db_landlord_email', label: 'E-mail do Locador', field_type: 'email' }
+    }
     if (clean.includes('LOCATARIO_FONE') || clean.includes('LOCATARIO_TEL') || (clean.includes('LOCATARIO') && clean.includes('TELEFONE'))) {
       return { origin: 'db_tenant_phone', label: 'Telefone do Locatário', field_type: 'phone' }
+    }
+    if (clean.includes('LOCADOR_FONE') || clean.includes('LOCADOR_TEL') || (clean.includes('LOCADOR') && clean.includes('TELEFONE'))) {
+      return { origin: 'db_landlord_phone', label: 'Telefone do Locador', field_type: 'phone' }
     }
     if (clean.includes('IMOVEL_NOME') || clean.includes('NOME_IMOVEL') || (clean.includes('IMOVEL') && clean.includes('NOME'))) {
       return { origin: 'db_property_name', label: 'Nome do Imóvel', field_type: 'text' }
     }
     if (clean.includes('IMOVEL_ENDERECO') || clean.includes('IMOVEL_RUA') || (clean.includes('IMOVEL') && clean.includes('END'))) {
       return { origin: 'db_property_address', label: 'Endereço do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('LOCADOR_ENDERECO') || (clean.includes('LOCADOR') && clean.includes('END')) || clean.includes('PROPRIETARIO_ENDERECO')) {
+      return { origin: 'db_landlord_address', label: 'Endereço do Locador', field_type: 'text' }
     }
     if (clean.includes('VALOR_ALUGUEL') || clean.includes('ALUGUEL_VALOR') || clean.includes('VALOR') || clean.includes('RENT')) {
       return { origin: 'db_rent_value', label: 'Valor do Aluguel', field_type: 'currency' }
@@ -509,6 +524,13 @@ export default function TemplateManagerModal() {
                                     <option value="db_tenant_document">Inquilino: CPF/CNPJ</option>
                                     <option value="db_tenant_email">Inquilino: E-mail</option>
                                     <option value="db_tenant_phone">Inquilino: Telefone</option>
+                                  </optgroup>
+                                  <optgroup label="Dados do Locador">
+                                    <option value="db_landlord_name">Locador: Nome / Razão Social</option>
+                                    <option value="db_landlord_document">Locador: CPF/CNPJ</option>
+                                    <option value="db_landlord_email">Locador: E-mail</option>
+                                    <option value="db_landlord_phone">Locador: Telefone</option>
+                                    <option value="db_landlord_address">Locador: Endereço completo</option>
                                   </optgroup>
                                   <optgroup label="Dados do Imóvel">
                                     <option value="db_property_name">Imóvel: Identificação</option>
