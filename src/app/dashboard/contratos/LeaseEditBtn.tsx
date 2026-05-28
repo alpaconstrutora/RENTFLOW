@@ -145,8 +145,8 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
       </button>
 
       {isOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 8, 0.85)', backdropFilter: 'blur(20px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'left' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '560px', backgroundColor: 'rgba(25, 28, 38, 0.95)', padding: '40px', position: 'relative', borderRadius: '24px', boxShadow: '0 30px 60px rgba(0,0,0,1)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 8, 0.85)', backdropFilter: 'blur(20px)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '40px 20px', overflowY: 'auto', textAlign: 'left' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '560px', backgroundColor: 'rgba(25, 28, 38, 0.95)', padding: '32px 24px', position: 'relative', borderRadius: '24px', boxShadow: '0 30px 60px rgba(0,0,0,1)', border: '1px solid rgba(255,255,255,0.1)', boxSizing: 'border-box', marginBottom: '40px' }}>
             <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ position: 'absolute', top: '24px', right: '24px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <X size={24} />
             </button>
