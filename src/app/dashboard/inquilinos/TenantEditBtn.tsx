@@ -4,6 +4,7 @@ import { useState, useRef, ChangeEvent } from 'react'
 import { Edit, X, Search, Loader2, Camera } from 'lucide-react'
 import { updateTenantAction } from './actions'
 import { createClient } from '../../../utils/supabase/client'
+import BankAccountTab from '../components/BankAccountTab'
 
 const MARITAL_OPTIONS = [
   { value: '',         label: 'Não informado' },
@@ -93,6 +94,7 @@ interface Props {
 
 export default function TenantEditBtn({ userId, tenant }: Props) {
   const [isOpen, setIsOpen]       = useState(false)
+  const [activeTab, setActiveTab] = useState<'general' | 'bank'>('general')
   const [errorMsg, setErrorMsg]   = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -233,14 +235,43 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,8,0.85)', backdropFilter: 'blur(20px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'left' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '560px', background: 'rgba(25,28,38,0.97)', padding: '36px', position: 'relative', borderRadius: '24px', boxShadow: '0 30px 60px rgba(0,0,0,1)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
 
-            <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ position: 'absolute', top: '20px', right: '20px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button type="button" onClick={() => { setIsOpen(false); setActiveTab('general'); }} disabled={isLoading} style={{ position: 'absolute', top: '20px', right: '20px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <X size={22} />
             </button>
 
             <h2 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', marginBottom: '4px', color: 'white' }}>Editar Inquilino</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', fontSize: '13px' }}>Atualize os dados do inquilino.</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '13px' }}>Atualize os dados e as configurações do inquilino.</p>
 
-            <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Abas */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '24px', gap: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('general')}
+                style={{
+                  padding: '10px 4px', background: 'transparent', border: 'none',
+                  borderBottom: `2px solid ${activeTab === 'general' ? 'var(--accent-color)' : 'transparent'}`,
+                  color: activeTab === 'general' ? 'white' : 'var(--text-muted)',
+                  cursor: 'pointer', fontWeight: 600, fontSize: '14px', transition: '0.2s'
+                }}
+              >
+                👤 Dados Gerais
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('bank')}
+                style={{
+                  padding: '10px 4px', background: 'transparent', border: 'none',
+                  borderBottom: `2px solid ${activeTab === 'bank' ? 'var(--accent-color)' : 'transparent'}`,
+                  color: activeTab === 'bank' ? 'white' : 'var(--text-muted)',
+                  cursor: 'pointer', fontWeight: 600, fontSize: '14px', transition: '0.2s'
+                }}
+              >
+                💰 Dados Bancários
+              </button>
+            </div>
+
+            {activeTab === 'general' ? (
+              <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <input type="hidden" name="id"        value={tenant.id} />
               <input type="hidden" name="type"      value={tenantType} />
               <input type="hidden" name="photo_url" value={photoUrl ?? ''} />
@@ -461,7 +492,7 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ padding: '12px 20px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <button type="button" onClick={() => { setIsOpen(false); setActiveTab('general'); }} disabled={isLoading} style={{ padding: '12px 20px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={isLoading || photoLoading} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: (isLoading || photoLoading) ? 0.7 : 1 }}>
@@ -469,6 +500,9 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                 </button>
               </div>
             </form>
+            ) : (
+              <BankAccountTab ownerType="tenant" ownerId={tenant.id} />
+            )}
           </div>
         </div>
       )}

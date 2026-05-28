@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { maskDocument, maskPhone } from '../../../lib/masks'
 import { upsertLandlordProfileAction } from './landlord-profiles/actions'
+import BankAccountTab from '../components/BankAccountTab'
 
 export interface LandlordProfile {
   id: string
@@ -34,6 +35,7 @@ const lbl: React.CSSProperties = {
 
 export default function LandlordProfileModal({ profile, isOnlyProfile, onClose }: Props) {
   const isEdit = !!profile
+  const [activeTab, setActiveTab] = useState<'general' | 'bank'>('general')
   const router = useRouter()
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
   const [errMsg, setErrMsg] = useState('')
@@ -55,18 +57,49 @@ export default function LandlordProfileModal({ profile, isOnlyProfile, onClose }
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,5,8,0.85)', backdropFilter: 'blur(20px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div className="glass-panel" style={{ width: '100%', maxWidth: '560px', backgroundColor: 'rgba(25,28,38,0.97)', padding: '40px', position: 'relative', borderRadius: '24px', boxShadow: '0 30px 60px rgba(0,0,0,1)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
-        <button type="button" onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+        <button type="button" onClick={() => { onClose(); setActiveTab('general'); }} style={{ position: 'absolute', top: '24px', right: '24px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
           <X size={24} />
         </button>
 
         <h2 style={{ fontSize: '22px', color: 'white', marginBottom: '6px' }}>
           {isEdit ? 'Editar Perfil de Locador' : 'Novo Perfil de Locador'}
         </h2>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '28px' }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
           Cada perfil pode ter um CPF ou CNPJ diferente — útil para quem tem imóveis em PF e PJ.
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        {/* Abas se for Edição */}
+        {isEdit && (
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '24px', gap: '16px' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('general')}
+              style={{
+                padding: '10px 4px', background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${activeTab === 'general' ? 'var(--accent-color)' : 'transparent'}`,
+                color: activeTab === 'general' ? 'white' : 'var(--text-muted)',
+                cursor: 'pointer', fontWeight: 600, fontSize: '14px', transition: '0.2s'
+              }}
+            >
+              👤 Dados Gerais
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('bank')}
+              style={{
+                padding: '10px 4px', background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${activeTab === 'bank' ? 'var(--accent-color)' : 'transparent'}`,
+                color: activeTab === 'bank' ? 'white' : 'var(--text-muted)',
+                cursor: 'pointer', fontWeight: 600, fontSize: '14px', transition: '0.2s'
+              }}
+            >
+              💰 Dados Bancários
+            </button>
+          </div>
+        )}
+
+        {!isEdit || activeTab === 'general' ? (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {isEdit && <input type="hidden" name="id" value={profile!.id} />}
           <input type="hidden" name="is_default" value={makeDefault ? 'true' : 'false'} />
 
@@ -171,7 +204,7 @@ export default function LandlordProfileModal({ profile, isOnlyProfile, onClose }
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-            <button type="button" onClick={onClose} style={{ padding: '12px 24px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            <button type="button" onClick={() => { onClose(); setActiveTab('general'); }} style={{ padding: '12px 24px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
               Cancelar
             </button>
             <button type="submit" disabled={status === 'saving'} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: status === 'saving' ? 0.7 : 1 }}>
@@ -179,6 +212,9 @@ export default function LandlordProfileModal({ profile, isOnlyProfile, onClose }
             </button>
           </div>
         </form>
+        ) : (
+          <BankAccountTab ownerType="landlord" ownerId={profile!.id} />
+        )}
       </div>
     </div>
   )
