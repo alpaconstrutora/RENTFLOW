@@ -3,12 +3,26 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 
-export default function PrintBtn() {
+interface PrintBtnProps {
+  downloadUrl?: string | null
+  isTemplate?: boolean
+}
+
+export default function PrintBtn({ downloadUrl, isTemplate }: PrintBtnProps) {
   const params = useParams()
   const leaseId = params.leaseId as string
   const [loading, setLoading] = useState(false)
 
   async function handleDownload() {
+    if (isTemplate && downloadUrl) {
+      // Inicia download direto do DOCX oficial preenchido
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `contrato-${leaseId.split('-')[0]}.docx`
+      a.click()
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch(`/api/pdf/contrato/${leaseId}`)
@@ -38,7 +52,8 @@ export default function PrintBtn() {
         opacity: loading ? 0.7 : 1,
       }}
     >
-      {loading ? 'Gerando PDF...' : 'Baixar PDF'}
+      {isTemplate ? 'Baixar Contrato (DOCX)' : (loading ? 'Gerando PDF...' : 'Baixar PDF')}
     </button>
   )
 }
+

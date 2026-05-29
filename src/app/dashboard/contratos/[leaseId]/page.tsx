@@ -104,6 +104,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
 
   let variableValues: any[] = []
   let downloadUrl: string | null = null
+  let docxHtml: string | null = null
 
   if (instanceRaw) {
     const { data: vals } = await supabase
@@ -117,6 +118,21 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
         .from('lease-documents')
         .createSignedUrl(instanceRaw.generated_docx_path, 3600)
       if (signedData) downloadUrl = signedData.signedUrl
+
+      try {
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from('lease-documents')
+          .download(instanceRaw.generated_docx_path)
+
+        if (fileData && !downloadError) {
+          const arrayBuffer = await fileData.arrayBuffer()
+          const mammoth = await import('mammoth')
+          const result = await mammoth.convertToHtml({ buffer: Buffer.from(arrayBuffer) })
+          docxHtml = result.value
+        }
+      } catch (err) {
+        console.error("Erro ao converter DOCX para HTML com mammoth:", err)
+      }
     }
   }
 
@@ -191,7 +207,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
       `}</style>
 
       <div className="print-hide" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <PrintBtn />
+        <PrintBtn downloadUrl={downloadUrl} isTemplate={!!instanceRaw} />
         <SendContractEmailBtn leaseId={leaseId} tenantEmail={tenant?.email ?? null} />
         <a href="/dashboard/contratos" style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none' }}>
           ← Voltar aos Contratos
@@ -368,205 +384,217 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
         borderRadius: '12px', padding: '56px 64px',
         boxShadow: '0 4px 32px rgba(0,0,0,0.15)', fontFamily: 'Georgia, serif', lineHeight: 1.7,
       }}>
-        {/* Cabeçalho */}
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1a1a', paddingBottom: '24px', marginBottom: '36px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '3px', textTransform: 'uppercase' }}>
-            {contractTitle}
-          </h1>
-          <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>N.º {contractNum} · Referência exclusivamente interna — não possui valor jurídico autônomo</p>
-        </div>
+        {docxHtml ? (
+          <div 
+            className="docx-content" 
+            dangerouslySetInnerHTML={{ __html: docxHtml }} 
+            style={{
+              wordBreak: 'break-word',
+            }}
+          />
+        ) : (
+          <>
+            {/* Cabeçalho */}
+            <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1a1a', paddingBottom: '24px', marginBottom: '36px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '3px', textTransform: 'uppercase' }}>
+                {contractTitle}
+              </h1>
+              <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>N.º {contractNum} · Referência exclusivamente interna — não possui valor jurídico autônomo</p>
+            </div>
 
-        {/* Cláusula 1 — Das Partes */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 1 — Das Partes</h2>
-          <p style={pStyle}>
-            <strong>LOCADOR:</strong> {owner.name}
-            {owner.document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${owner.document}` : ''}
-            {owner.phone ? `, telefone ${owner.phone}` : ''}
-            {owner.address ? `, residente/domiciliado(a) em ${owner.address}` : ''}.
-          </p>
-          <p style={{ ...pStyle, margin: guaranteeType === 'fiador' && tenant?.guarantor_name ? '0 0 10px' : 0 }}>
-            <strong>LOCATÁRIO:</strong> {tenant?.name ?? '—'}
-            {tenant?.document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${tenant.document}` : ''}
-            {tenant?.email ? `, e-mail ${tenant.email}` : ''}
-            {tenant?.phone ? `, telefone ${tenant.phone}` : ''}
-            {tenantAddress ? `, residente/domiciliado(a) em ${tenantAddress}` : ''}.
-          </p>
-          {guaranteeType === 'fiador' && tenant?.guarantor_name ? (
-            <p style={{ fontSize: '14px', margin: 0 }}>
-              <strong>FIADOR:</strong> {tenant.guarantor_name}
-              {tenant.guarantor_document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${tenant.guarantor_document}` : ''},
-              o qual declara possuir bens suficientes para garantir a presente locação, responsabilizando-se
-              solidariamente pelas obrigações do LOCATÁRIO.
-            </p>
-          ) : null}
-        </section>
-
-        {/* Cláusula 2 — Do Objeto */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 2 — Do Objeto</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>
-            O LOCADOR cede ao LOCATÁRIO, a título de locação, o imóvel denominado <strong>{property?.name ?? '—'}</strong>
-            {propertyAddress ? `, localizado em ${propertyAddress}` : ''}, nas condições estabelecidas neste instrumento.
-          </p>
-        </section>
-
-        {/* Cláusula 3 — Do Prazo */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 3 — Do Prazo</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>{endClause}</p>
-        </section>
-
-        {/* Cláusula 4 — Do Aluguel */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 4 — Do Aluguel</h2>
-          <p style={pStyle}>
-            O aluguel mensal é de <strong>{formatBRL(lease.rent_value)}</strong> ({valorPorExtenso(lease.rent_value)}),
-            a ser pago até o dia <strong>{String(lease.due_day).padStart(2, '0')}</strong> de cada mês,
-            mediante transferência bancária ou outro meio acordado entre as partes.
-          </p>
-          {discounts && discounts.length > 0 && (
-            <div style={{ margin: '12px 0' }}>
-              <p style={{ ...pStyle, fontWeight: 600 }}>
-                Parágrafo Único — Fica pactuado um desconto temporário/escalonado no valor do aluguel conforme a seguir:
+            {/* Cláusula 1 — Das Partes */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 1 — Das Partes</h2>
+              <p style={pStyle}>
+                <strong>LOCADOR:</strong> {owner.name}
+                {owner.document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${owner.document}` : ''}
+                {owner.phone ? `, telefone ${owner.phone}` : ''}
+                {owner.address ? `, residente/domiciliado(a) em ${owner.address}` : ''}.
               </p>
-              <ul style={{ fontSize: '14px', margin: '0 0 12px', paddingLeft: '20px', listStyleType: 'disc' }}>
-                {discounts.map((d, index) => (
-                  <li key={index} style={{ marginBottom: '4px' }}>
-                    Desconto de <strong>{formatBRL(d.discount_value)}</strong> e parcelas líquidas de <strong>{formatBRL(lease.rent_value - d.discount_value)}</strong> nas parcelas de {d.start_installment} a {d.end_installment}.
-                  </li>
-                ))}
+              <p style={{ ...pStyle, margin: guaranteeType === 'fiador' && tenant?.guarantor_name ? '0 0 10px' : 0 }}>
+                <strong>LOCATÁRIO:</strong> {tenant?.name ?? '—'}
+                {tenant?.document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${tenant.document}` : ''}
+                {tenant?.email ? `, e-mail ${tenant.email}` : ''}
+                {tenant?.phone ? `, telefone ${tenant.phone}` : ''}
+                {tenantAddress ? `, residente/domiciliado(a) em ${tenantAddress}` : ''}.
+              </p>
+              {guaranteeType === 'fiador' && tenant?.guarantor_name ? (
+                <p style={{ fontSize: '14px', margin: 0 }}>
+                  <strong>FIADOR:</strong> {tenant.guarantor_name}
+                  {tenant.guarantor_document ? `, inscrito(a) no CPF/CNPJ sob o n.º ${tenant.guarantor_document}` : ''},
+                  o qual declara possuir bens suficientes para garantir a presente locação, responsabilizando-se
+                  solidariamente pelas obrigações do LOCATÁRIO.
+                </p>
+              ) : null}
+            </section>
+
+            {/* Cláusula 2 — Do Objeto */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 2 — Do Objeto</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                O LOCADOR cede ao LOCATÁRIO, a título de locação, o imóvel denominado <strong>{property?.name ?? '—'}</strong>
+                {propertyAddress ? `, localizado em ${propertyAddress}` : ''}, nas condições estabelecidas neste instrumento.
+              </p>
+            </section>
+
+            {/* Cláusula 3 — Do Prazo */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 3 — Do Prazo</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>{endClause}</p>
+            </section>
+
+            {/* Cláusula 4 — Do Aluguel */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 4 — Do Aluguel</h2>
+              <p style={pStyle}>
+                O aluguel mensal é de <strong>{formatBRL(lease.rent_value)}</strong> ({valorPorExtenso(lease.rent_value)}),
+                a ser pago até o dia <strong>{String(lease.due_day).padStart(2, '0')}</strong> de cada mês,
+                mediante transferência bancária ou outro meio acordado entre as partes.
+              </p>
+              {discounts && discounts.length > 0 && (
+                <div style={{ margin: '12px 0' }}>
+                  <p style={{ ...pStyle, fontWeight: 600 }}>
+                    Parágrafo Único — Fica pactuado um desconto temporário/escalonado no valor do aluguel conforme a seguir:
+                  </p>
+                  <ul style={{ fontSize: '14px', margin: '0 0 12px', paddingLeft: '20px', listStyleType: 'disc' }}>
+                    {discounts.map((d, index) => (
+                      <li key={index} style={{ marginBottom: '4px' }}>
+                        Desconto de <strong>{formatBRL(d.discount_value)}</strong> e parcelas líquidas de <strong>{formatBRL(lease.rent_value - d.discount_value)}</strong> nas parcelas de {d.start_installment} a {d.end_installment}.
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                O não pagamento no prazo acarretará multa de 2% (dois por cento) sobre o valor em aberto,
+                acrescida de juros moratórios de 1% (um por cento) ao mês e correção monetária pelo IGPM.
+              </p>
+            </section>
+
+            {/* Cláusula 5 — Do Reajuste */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 5 — Do Reajuste</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>{adjustmentClause}</p>
+            </section>
+
+            {/* Cláusula 6 — Da Garantia */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 6 — Da Garantia</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                Fica estipulado como modalidade de garantia desta locação:{' '}
+                <strong>{guaranteeLabel(guaranteeType)}</strong>,
+                nos termos do art. 37 da Lei n.º 8.245/1991.
+                {guaranteeType === 'nenhuma'
+                  ? ' As partes declaram expressamente dispensar qualquer modalidade de garantia.'
+                  : ''}
+              </p>
+            </section>
+
+            {/* Cláusula 7 — Do IPTU e Condomínio */}
+            {hasIptuCondo ? (
+              <section style={sectionStyle}>
+                <h2 style={h2Style}>Cláusula 7 — Do IPTU e Condomínio</h2>
+                {iptuText ? <p style={pStyle}>{iptuText}</p> : null}
+                {condoText ? <p style={{ fontSize: '14px', margin: 0 }}>{condoText}</p> : null}
+              </section>
+            ) : null}
+
+            {/* Cláusula 8 — Das Obrigações */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 8 — Das Obrigações</h2>
+              <p style={pStyle}><strong>Do Locatário:</strong></p>
+              <ul style={{ fontSize: '14px', margin: '0 0 10px', paddingLeft: '20px' }}>
+                <li>Pagar o aluguel na data convencionada;</li>
+                <li>Conservar o imóvel em boas condições de uso e higiene;</li>
+                <li>Não sublocar, ceder ou emprestar o imóvel sem autorização prévia e por escrito do Locador;</li>
+                <li>Responder por danos causados ao imóvel durante o período de locação;</li>
+                <li>Devolver o imóvel nas mesmas condições in que o recebeu ao término da locação.</li>
               </ul>
-            </div>
-          )}
-          <p style={{ fontSize: '14px', margin: 0 }}>
-            O não pagamento no prazo acarretará multa de 2% (dois por cento) sobre o valor em aberto,
-            acrescida de juros moratórios de 1% (um por cento) ao mês e correção monetária pelo IGPM.
-          </p>
-        </section>
+              <p style={pStyle}><strong>Do Locador:</strong></p>
+              <ul style={{ fontSize: '14px', margin: 0, paddingLeft: '20px' }}>
+                <li>Entregar o imóvel em condições de uso;</li>
+                <li>Garantir o uso pacífico do imóvel durante a locação;</li>
+                <li>Realizar reparos estruturais que não sejam decorrentes do uso normal pelo Locatário.</li>
+              </ul>
+            </section>
 
-        {/* Cláusula 5 — Do Reajuste */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 5 — Do Reajuste</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>{adjustmentClause}</p>
-        </section>
+            {/* Cláusula 9 — Da Rescisão */}
+            <section style={sectionStyle}>
+              <h2 style={h2Style}>Cláusula 9 — Da Rescisão</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                A rescisão antecipada por iniciativa do Locatário implicará em multa proporcional ao período remanescente do contrato,
+                calculada sobre três meses de aluguel, salvo acordo em contrário. A rescisão por infração contratual dispensa aviso prévio.
+              </p>
+            </section>
 
-        {/* Cláusula 6 — Da Garantia */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 6 — Da Garantia</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>
-            Fica estipulado como modalidade de garantia desta locação:{' '}
-            <strong>{guaranteeLabel(guaranteeType)}</strong>,
-            nos termos do art. 37 da Lei n.º 8.245/1991.
-            {guaranteeType === 'nenhuma'
-              ? ' As partes declaram expressamente dispensar qualquer modalidade de garantia.'
-              : ''}
-          </p>
-        </section>
+            {/* Cláusula 10 — Do Foro */}
+            <section style={{ marginBottom: '48px' }}>
+              <h2 style={h2Style}>Cláusula 10 — Do Foro</h2>
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                As partes elegem o foro da Comarca de {property?.city ?? 'domicílio do Locador'} para dirimir quaisquer
+                controvérsias oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.
+              </p>
+            </section>
 
-        {/* Cláusula 7 — Do IPTU e Condomínio */}
-        {hasIptuCondo ? (
-          <section style={sectionStyle}>
-            <h2 style={h2Style}>Cláusula 7 — Do IPTU e Condomínio</h2>
-            {iptuText ? <p style={pStyle}>{iptuText}</p> : null}
-            {condoText ? <p style={{ fontSize: '14px', margin: 0 }}>{condoText}</p> : null}
-          </section>
-        ) : null}
+            {/* Assinaturas */}
+            <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '24px' }}>
+              <p style={{ fontSize: '14px', textAlign: 'center', marginBottom: '48px' }}>
+                E por estarem justas e acordadas, as partes assinam o presente instrumento em 2 (duas) vias de igual teor.
+              </p>
+              <p style={{ fontSize: '13px', textAlign: 'center', color: '#555', marginBottom: '48px' }}>{cidadeData}</p>
 
-        {/* Cláusula 8 — Das Obrigações */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 8 — Das Obrigações</h2>
-          <p style={pStyle}><strong>Do Locatário:</strong></p>
-          <ul style={{ fontSize: '14px', margin: '0 0 10px', paddingLeft: '20px' }}>
-            <li>Pagar o aluguel na data convencionada;</li>
-            <li>Conservar o imóvel em boas condições de uso e higiene;</li>
-            <li>Não sublocar, ceder ou emprestar o imóvel sem autorização prévia e por escrito do Locador;</li>
-            <li>Responder por danos causados ao imóvel durante o período de locação;</li>
-            <li>Devolver o imóvel nas mesmas condições em que o recebeu ao término da locação.</li>
-          </ul>
-          <p style={pStyle}><strong>Do Locador:</strong></p>
-          <ul style={{ fontSize: '14px', margin: 0, paddingLeft: '20px' }}>
-            <li>Entregar o imóvel em condições de uso;</li>
-            <li>Garantir o uso pacífico do imóvel durante a locação;</li>
-            <li>Realizar reparos estruturais que não sejam decorrentes do uso normal pelo Locatário.</li>
-          </ul>
-        </section>
-
-        {/* Cláusula 9 — Da Rescisão */}
-        <section style={sectionStyle}>
-          <h2 style={h2Style}>Cláusula 9 — Da Rescisão</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>
-            A rescisão antecipada por iniciativa do Locatário implicará em multa proporcional ao período remanescente do contrato,
-            calculada sobre três meses de aluguel, salvo acordo em contrário. A rescisão por infração contratual dispensa aviso prévio.
-          </p>
-        </section>
-
-        {/* Cláusula 10 — Do Foro */}
-        <section style={{ marginBottom: '48px' }}>
-          <h2 style={h2Style}>Cláusula 10 — Do Foro</h2>
-          <p style={{ fontSize: '14px', margin: 0 }}>
-            As partes elegem o foro da Comarca de {property?.city ?? 'domicílio do Locador'} para dirimir quaisquer
-            controvérsias oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.
-          </p>
-        </section>
-
-        {/* Assinaturas */}
-        <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '24px' }}>
-          <p style={{ fontSize: '14px', textAlign: 'center', marginBottom: '48px' }}>
-            E por estarem justas e acordadas, as partes assinam o presente instrumento em 2 (duas) vias de igual teor.
-          </p>
-          <p style={{ fontSize: '13px', textAlign: 'center', color: '#555', marginBottom: '48px' }}>{cidadeData}</p>
-
-          {/* Locador / Locatário */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginBottom: '40px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
-                <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{owner.name}</p>
-                <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>LOCADOR</p>
-                {owner.document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {owner.document}</p>}
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
-                <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{tenant?.name ?? '—'}</p>
-                <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>LOCATÁRIO</p>
-                {tenant?.document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {tenant.document}</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Fiador (se aplicável) */}
-          {guaranteeType === 'fiador' && tenant?.guarantor_name ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginBottom: '40px' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
-                  <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{tenant.guarantor_name}</p>
-                  <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>FIADOR</p>
-                  {tenant.guarantor_document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {tenant.guarantor_document}</p>}
+              {/* Locador / Locatário */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginBottom: '40px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
+                    <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{owner.name}</p>
+                    <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>LOCADOR</p>
+                    {owner.document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {owner.document}</p>}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
+                    <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{tenant?.name ?? '—'}</p>
+                    <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>LOCATÁRIO</p>
+                    {tenant?.document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {tenant.document}</p>}
+                  </div>
                 </div>
               </div>
-              <div />
-            </div>
-          ) : null}
 
-          {/* Testemunhas */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginTop: '8px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px dashed #aaa', paddingTop: '10px' }}>
-                <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>TESTEMUNHA 1 — Nome / CPF</p>
+              {/* Fiador (se aplicável) */}
+              {guaranteeType === 'fiador' && tenant?.guarantor_name ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginBottom: '40px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ borderTop: '1px solid #1a1a1a', paddingTop: '10px' }}>
+                      <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{tenant.guarantor_name}</p>
+                      <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>FIADOR</p>
+                      {tenant.guarantor_document && <p style={{ fontSize: '11px', color: '#888', margin: '2px 0 0' }}>CPF/CNPJ: {tenant.guarantor_document}</p>}
+                    </div>
+                  </div>
+                  <div />
+                </div>
+              ) : null}
+
+              {/* Testemunhas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', marginTop: '8px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderTop: '1px dashed #aaa', paddingTop: '10px' }}>
+                    <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>TESTEMUNHA 1 — Nome / CPF</p>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderTop: '1px dashed #aaa', paddingTop: '10px' }}>
+                    <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>TESTEMUNHA 2 — Nome / CPF</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px dashed #aaa', paddingTop: '10px' }}>
-                <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>TESTEMUNHA 2 — Nome / CPF</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <p style={{ fontSize: '11px', color: '#bbb', textAlign: 'center', marginTop: '24px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
-          Documento gerado eletronicamente · RentFlow · Contrato ID {contractNum} · Este documento não substitui assessoria jurídica especializada.
-        </p>
+            <p style={{ fontSize: '11px', color: '#bbb', textAlign: 'center', marginTop: '24px', borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
+              Documento gerado eletronicamente · RentFlow · Contrato ID {contractNum} · Este documento não substitui assessoria jurídica especializada.
+            </p>
+          </>
+        )}
       </div>
     </>
   )
