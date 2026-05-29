@@ -954,21 +954,29 @@ export async function generateContractInstanceAction(
     if (instanceError) throw new Error(instanceError.message)
 
     const docxPath = `${user.id}/leases/${leaseId}/${instance.id}_contrato.docx`
-    await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('lease-documents')
       .upload(docxPath, generatedZipBuffer, {
         contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         upsert: true
       })
 
+    if (uploadError) {
+      throw new Error(`Erro ao salvar arquivo DOCX no Storage: ${uploadError.message}`)
+    }
+
     const pdfPath = `${user.id}/leases/${leaseId}/${instance.id}_contrato.pdf`
     const mockPdfBuffer = Buffer.from("PDF SIMULADO - MOTOR DE TEMPLATES JURIDICOS RENTFLOW")
-    await supabase.storage
+    const { error: pdfUploadError } = await supabase.storage
       .from('lease-documents')
       .upload(pdfPath, mockPdfBuffer, {
         contentType: 'application/pdf',
         upsert: true
       })
+
+    if (pdfUploadError) {
+      throw new Error(`Erro ao salvar arquivo PDF no Storage: ${pdfUploadError.message}`)
+    }
 
     const crypto = await import('crypto')
     const sha256Hash = crypto.createHash('sha256').update(generatedZipBuffer).digest('hex')

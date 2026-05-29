@@ -99,6 +99,8 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
       .select('id, generated_docx_path, generated_pdf_path, sha256_hash, created_at, template:contract_templates(name, version)')
       .eq('lease_id', leaseId)
       .eq('status', 'ready')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
   ])
 
