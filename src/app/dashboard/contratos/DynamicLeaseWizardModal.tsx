@@ -291,6 +291,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
       if (loadedFromLease) {
         const result = await generateContractInstanceAction(selectedTemplateId, loadedFromLease.id, dynamicValues)
         if (!result.success) {
+          alert(`[ERRO BACKEND] Falha na Server Action generateContractInstanceAction: ${result.error}`)
           setErrorMsg(result.error || 'Erro ao gerar documento.')
           setIsLoading(false)
           return
@@ -309,6 +310,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
 
         const result = await createLeaseAction(formData)
         if (typeof result === 'string') {
+          alert(`[ERRO BACKEND] Falha ao efetivar contrato: ${result}`)
           setErrorMsg(result)
           setIsLoading(false)
           return
@@ -320,6 +322,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
         if (selectedTemplateId && leaseIdToUse) {
           const genResult = await generateContractInstanceAction(selectedTemplateId, leaseIdToUse, dynamicValues)
           if (!genResult.success) {
+            alert(`[ERRO BACKEND] Falha ao gerar o documento DOCX a partir do modelo: ${genResult.error}`)
             setErrorMsg(genResult.error || 'Erro ao gerar documento do modelo.')
             setIsLoading(false)
             return
@@ -331,7 +334,9 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
       setTimeout(() => { setIsOpen(false); resetForm() }, 1500)
 
     } catch (err: unknown) {
-      setErrorMsg((err as Error).message || 'Erro ao efetivar contrato.')
+      const msg = (err as Error).message || 'Erro ao efetivar contrato.'
+      alert(`[CRASH FRONTEND] Ocorreu um erro inesperado no React: ${msg}`)
+      setErrorMsg(msg)
     } finally {
       setIsLoading(false)
     }
@@ -569,7 +574,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
 
             {/* ── STEP 3 ─────────────────────────────────────────────── */}
             {currentStep === 3 && (
-              <form onSubmit={handleSubmit}>
+              <div>
                 <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '4px', fontWeight: 600 }}>Confirmação e Efetivação</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
                   {isOccupied ? 'O documento DOCX será gerado para o contrato existente.' : 'Revise antes de criar o contrato e gerar o documento.'}
@@ -635,12 +640,12 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                   <button type="button" onClick={handlePrevStep} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <ChevronLeft size={16} /> Voltar
                   </button>
-                  <button type="submit" disabled={isLoading} style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--success-bg)', color: 'var(--success-color)', fontWeight: 'bold', cursor: 'pointer', opacity: isLoading ? 0.3 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button type="button" onClick={handleSubmit} disabled={isLoading} style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--success-bg)', color: 'var(--success-color)', fontWeight: 'bold', cursor: 'pointer', opacity: isLoading ? 0.3 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {isLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
                     {isLoading ? 'Gerando documento...' : isOccupied ? 'Gerar Documento DOCX' : 'Efetivar Contrato'}
                   </button>
                 </div>
-              </form>
+              </div>
             )}
           </div>
         </div>
