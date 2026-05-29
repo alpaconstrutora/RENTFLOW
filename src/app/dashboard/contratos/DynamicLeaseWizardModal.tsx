@@ -51,7 +51,6 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
   // Step 2: Dynamic fields values
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({})
 
-  const vacantProperties = properties.filter(p => p.status === 'vacant')
 
   useEffect(() => {
     if (isOpen) {
@@ -282,14 +281,18 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
             {currentStep === 1 && (
               <div>
                 <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '8px', fontWeight: 600 }}>Parâmetros do Contrato</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Selecione o imóvel vago, inquilino e as condições iniciais de locação.</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Selecione o imóvel, inquilino e as condições iniciais de locação.</p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Imóvel Alvo (Vago) <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                    <label style={labelStyle}>Imóvel Alvo <span style={{ color: 'var(--danger-color)' }}>*</span></label>
                     <select value={selectedPropertyId} onChange={e => setSelectedPropertyId(e.target.value)} required style={inputStyle}>
                       <option value="">-- Selecione o Imóvel --</option>
-                      {vacantProperties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {properties.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.status !== 'vacant' ? ' (Ocupado)' : ''}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -344,9 +347,9 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                   </div>
                 </div>
 
-                {vacantProperties.length === 0 && (
+                {properties.length === 0 && (
                   <div style={{ padding: '12px', background: 'var(--warning-bg)', color: 'var(--warning-color)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(255,184,74,0.15)', marginBottom: '20px' }}>
-                    Nenhum imóvel vago disponível para alocação.
+                    Nenhum imóvel cadastrado. Cadastre um em &quot;Imóveis&quot; antes de emitir contratos.
                   </div>
                 )}
 

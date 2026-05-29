@@ -31,7 +31,6 @@ export default function LeaseButtonWithModal({ properties, tenants, landlordProf
     setDiscounts(prev => prev.map((d, i) => i === index ? { ...d, [field]: value } : d))
   }
 
-  const vacantProperties = properties.filter(p => p.status === 'vacant')
 
   const handleSubmit = async (formData: FormData) => {
     setIsLoading(true)
@@ -121,16 +120,20 @@ export default function LeaseButtonWithModal({ properties, tenants, landlordProf
             ) : (
               <>
                 <h2 style={{ fontSize: '26px', fontFamily: 'var(--font-heading)', marginBottom: '8px', color: 'white' }}>Emissão de Contrato de Locação</h2>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', fontSize: '14px' }}>Vincule um Imóvel Vago e um Inquilino para ativar o motor transacional.</p>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', fontSize: '14px' }}>Vincule um Imóvel e um Inquilino para ativar o motor transacional.</p>
 
                 <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {/* Imóvel e Inquilino */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={labelStyle}>Imóvel Alvo (Apenas Vagos) <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                      <label style={labelStyle}>Imóvel Alvo <span style={{ color: 'var(--danger-color)' }}>*</span></label>
                       <select name="property_id" required style={inputStyle}>
                         <option value="">-- Selecione o Imóvel --</option>
-                        {vacantProperties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {properties.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}{p.status !== 'vacant' ? ' (Ocupado)' : ''}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -341,16 +344,16 @@ export default function LeaseButtonWithModal({ properties, tenants, landlordProf
                       {errorMsg}
                     </div>
                   )}
-                  {vacantProperties.length === 0 && (
+                  {properties.length === 0 && (
                     <div style={{ padding: '12px', background: 'rgba(255,200,50,0.1)', color: '#ffd166', borderRadius: '12px', fontSize: '14px', border: '1px solid rgba(255,200,50,0.3)' }}>
-                      Nenhum Imóvel Vago disponível. Cadastre um novo em &quot;Imóveis&quot;.
+                      Nenhum Imóvel cadastrado. Cadastre um em &quot;Imóveis&quot; antes de emitir um contrato.
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '16px' }}>
                     <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                       Cancelar
                     </button>
-                    <button type="submit" disabled={isLoading || vacantProperties.length === 0} style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--success-bg)', color: 'var(--success-color)', fontWeight: 'bold', cursor: 'pointer', opacity: (isLoading || vacantProperties.length === 0) ? 0.3 : 1 }}>
+                    <button type="submit" disabled={isLoading} style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--success-bg)', color: 'var(--success-color)', fontWeight: 'bold', cursor: 'pointer', opacity: isLoading ? 0.3 : 1 }}>
                       {isLoading ? 'Assinando...' : 'Efetivar Contrato'}
                     </button>
                   </div>
