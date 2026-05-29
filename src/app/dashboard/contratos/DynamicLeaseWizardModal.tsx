@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, X, ChevronRight, ChevronLeft, CheckCircle2, Info, Loader2, Zap } from 'lucide-react'
 import styles from '../../page.module.css'
-import { createLeaseAction, getContractTemplatesAction, getTemplateVariablesAction, getActiveLeaseByPropertyAction } from './actions'
+import { createLeaseAction, getContractTemplatesAction, getTemplateVariablesAction, getActiveLeaseByPropertyAction, generateContractInstanceAction } from './actions'
 
 interface TenantData {
   id: string
@@ -289,7 +289,6 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
 
     try {
       if (loadedFromLease) {
-        const { generateContractInstanceAction } = await import('./actions')
         const result = await generateContractInstanceAction(selectedTemplateId, loadedFromLease.id, dynamicValues)
         if (!result.success) {
           setErrorMsg(result.error || 'Erro ao gerar documento.')
@@ -319,7 +318,6 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
         const leaseIdToUse = result?.leaseId || (result as any)?.backfill?.leaseId
 
         if (selectedTemplateId && leaseIdToUse) {
-          const { generateContractInstanceAction } = await import('./actions')
           const genResult = await generateContractInstanceAction(selectedTemplateId, leaseIdToUse, dynamicValues)
           if (!genResult.success) {
             setErrorMsg(genResult.error || 'Erro ao gerar documento do modelo.')
