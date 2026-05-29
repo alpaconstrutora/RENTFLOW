@@ -70,8 +70,11 @@ export default function TemplateManagerModal() {
     if (clean.includes('LOCADOR_NOME') || (clean.includes('LOCADOR') && clean.includes('NOME')) || clean.includes('PROPRIETARIO_NOME')) {
       return { origin: 'db_landlord_name', label: 'Nome do Locador', field_type: 'text' }
     }
-    if (clean.includes('LOCATARIO_DOCUMENTO') || clean.includes('LOCATARIO_CPF') || clean.includes('LOCATARIO_CNPJ') || (clean.includes('LOCATARIO') && clean.includes('DOC'))) {
+    if (clean.includes('LOCATARIO_CPF') || clean.includes('LOCATARIO_CNPJ') || clean.includes('LOCATARIO_DOCUMENTO') || (clean.includes('LOCATARIO') && clean.includes('DOC'))) {
       return { origin: 'db_tenant_document', label: 'CPF/CNPJ do Locatário', field_type: 'cpf_cnpj' }
+    }
+    if (clean.includes('LOCATARIO_RG') || (clean.includes('LOCATARIO') && clean.includes('RG'))) {
+      return { origin: 'db_tenant_rg', label: 'RG do Locatário', field_type: 'text' }
     }
     if (clean.includes('LOCADOR_DOCUMENTO') || clean.includes('LOCADOR_CPF') || clean.includes('LOCADOR_CNPJ') || (clean.includes('LOCADOR') && clean.includes('DOC'))) {
       return { origin: 'db_landlord_document', label: 'CPF/CNPJ do Locador', field_type: 'cpf_cnpj' }
@@ -88,6 +91,30 @@ export default function TemplateManagerModal() {
     if (clean.includes('LOCADOR_FONE') || clean.includes('LOCADOR_TEL') || (clean.includes('LOCADOR') && clean.includes('TELEFONE'))) {
       return { origin: 'db_landlord_phone', label: 'Telefone do Locador', field_type: 'phone' }
     }
+    if (clean.includes('LOCATARIO_NASCIMENTO') || clean.includes('DATA_NASCIMENTO') || (clean.includes('LOCATARIO') && clean.includes('NASC'))) {
+      return { origin: 'db_tenant_birth_date', label: 'Data de Nascimento', field_type: 'date' }
+    }
+    if (clean.includes('LOCATARIO_PROFISSAO') || (clean.includes('LOCATARIO') && clean.includes('PROF'))) {
+      return { origin: 'db_tenant_profession', label: 'Profissão do Locatário', field_type: 'text' }
+    }
+    if (clean.includes('LOCATARIO_NACIONALIDADE') || (clean.includes('LOCATARIO') && clean.includes('NACION'))) {
+      return { origin: 'db_tenant_nationality', label: 'Nacionalidade do Locatário', field_type: 'text' }
+    }
+    if (clean.includes('ESTADO_CIVIL') || clean.includes('LOCATARIO_ESTADO_CIVIL') || (clean.includes('LOCATARIO') && clean.includes('CIVIL'))) {
+      return { origin: 'db_tenant_marital_status', label: 'Estado Civil do Locatário', field_type: 'text' }
+    }
+    if (clean.includes('LOCATARIO_ENDERECO') || (clean.includes('LOCATARIO') && clean.includes('END'))) {
+      return { origin: 'db_tenant_address', label: 'Endereço do Locatário', field_type: 'text' }
+    }
+    if (clean.includes('LOCATARIO_CEP') || (clean.includes('LOCATARIO') && clean.includes('CEP'))) {
+      return { origin: 'db_tenant_zip_code', label: 'CEP do Locatário', field_type: 'text' }
+    }
+    if (clean.includes('FIADOR_NOME') || (clean.includes('FIADOR') && clean.includes('NOME'))) {
+      return { origin: 'db_guarantor_name', label: 'Nome do Fiador', field_type: 'text' }
+    }
+    if (clean.includes('FIADOR_CPF') || clean.includes('FIADOR_DOCUMENTO') || (clean.includes('FIADOR') && clean.includes('DOC'))) {
+      return { origin: 'db_guarantor_document', label: 'CPF/CNPJ do Fiador', field_type: 'cpf_cnpj' }
+    }
     if (clean.includes('IMOVEL_NOME') || clean.includes('NOME_IMOVEL') || (clean.includes('IMOVEL') && clean.includes('NOME'))) {
       return { origin: 'db_property_name', label: 'Nome do Imóvel', field_type: 'text' }
     }
@@ -97,7 +124,7 @@ export default function TemplateManagerModal() {
     if (clean.includes('LOCADOR_ENDERECO') || (clean.includes('LOCADOR') && clean.includes('END')) || clean.includes('PROPRIETARIO_ENDERECO')) {
       return { origin: 'db_landlord_address', label: 'Endereço do Locador', field_type: 'text' }
     }
-    if (clean.includes('VALOR_ALUGUEL') || clean.includes('ALUGUEL_VALOR') || clean.includes('VALOR') || clean.includes('RENT')) {
+    if (clean.includes('VALOR_ALUGUEL') || clean.includes('ALUGUEL_VALOR') || clean.includes('RENT')) {
       return { origin: 'db_rent_value', label: 'Valor do Aluguel', field_type: 'currency' }
     }
     if (clean.includes('DIA_VENCIMENTO') || clean.includes('VENCIMENTO') || clean.includes('DUE_DAY')) {
@@ -610,35 +637,46 @@ export default function TemplateManagerModal() {
                               </td>
                               <td style={{ padding: '10px 16px' }}>
                                 <select
-                                  value={v.origin}
-                                  onChange={e => handleUpdateVariable(idx, 'origin', e.target.value)}
-                                  style={{ ...inputStyle, padding: '6px 10px', borderRadius: '6px', fontSize: '13px', colorScheme: 'dark' }}
-                                >
-                                  <option value="manual">Manual (Digitado na hora)</option>
-                                  <optgroup label="Dados do Inquilino">
-                                    <option value="db_tenant_name">Inquilino: Nome completo</option>
-                                    <option value="db_tenant_document">Inquilino: CPF/CNPJ</option>
-                                    <option value="db_tenant_email">Inquilino: E-mail</option>
-                                    <option value="db_tenant_phone">Inquilino: Telefone</option>
-                                  </optgroup>
-                                  <optgroup label="Dados do Locador">
-                                    <option value="db_landlord_name">Locador: Nome / Razão Social</option>
-                                    <option value="db_landlord_document">Locador: CPF/CNPJ</option>
-                                    <option value="db_landlord_email">Locador: E-mail</option>
-                                    <option value="db_landlord_phone">Locador: Telefone</option>
-                                    <option value="db_landlord_address">Locador: Endereço completo</option>
-                                  </optgroup>
-                                  <optgroup label="Dados do Imóvel">
-                                    <option value="db_property_name">Imóvel: Identificação</option>
-                                    <option value="db_property_address">Imóvel: Endereço completo</option>
-                                  </optgroup>
-                                  <optgroup label="Dados Comerciais do Contrato">
-                                    <option value="db_rent_value">Contrato: Valor do aluguel</option>
-                                    <option value="db_due_day">Contrato: Dia de vencimento</option>
-                                    <option value="db_start_date">Contrato: Início vigência</option>
-                                    <option value="db_end_date">Contrato: Término vigência</option>
-                                  </optgroup>
-                                </select>
+                                   value={v.origin}
+                                   onChange={e => handleUpdateVariable(idx, 'origin', e.target.value)}
+                                   style={{ ...inputStyle, padding: '6px 10px', borderRadius: '6px', fontSize: '13px', colorScheme: 'dark' }}
+                                 >
+                                   <option value="manual">Manual (Digitado na hora)</option>
+                                   <optgroup label="Dados do Inquilino">
+                                     <option value="db_tenant_name">Inquilino: Nome completo</option>
+                                     <option value="db_tenant_document">Inquilino: CPF/CNPJ</option>
+                                     <option value="db_tenant_rg">Inquilino: RG</option>
+                                     <option value="db_tenant_email">Inquilino: E-mail</option>
+                                     <option value="db_tenant_phone">Inquilino: Telefone</option>
+                                     <option value="db_tenant_birth_date">Inquilino: Data de Nascimento</option>
+                                     <option value="db_tenant_profession">Inquilino: Profissão</option>
+                                     <option value="db_tenant_nationality">Inquilino: Nacionalidade</option>
+                                     <option value="db_tenant_marital_status">Inquilino: Estado Civil</option>
+                                     <option value="db_tenant_address">Inquilino: Endereço completo</option>
+                                     <option value="db_tenant_zip_code">Inquilino: CEP</option>
+                                   </optgroup>
+                                   <optgroup label="Dados do Fiador">
+                                     <option value="db_guarantor_name">Fiador: Nome completo</option>
+                                     <option value="db_guarantor_document">Fiador: CPF/CNPJ</option>
+                                   </optgroup>
+                                   <optgroup label="Dados do Locador">
+                                     <option value="db_landlord_name">Locador: Nome / Razão Social</option>
+                                     <option value="db_landlord_document">Locador: CPF/CNPJ</option>
+                                     <option value="db_landlord_email">Locador: E-mail</option>
+                                     <option value="db_landlord_phone">Locador: Telefone</option>
+                                     <option value="db_landlord_address">Locador: Endereço completo</option>
+                                   </optgroup>
+                                   <optgroup label="Dados do Imóvel">
+                                     <option value="db_property_name">Imóvel: Identificação</option>
+                                     <option value="db_property_address">Imóvel: Endereço completo</option>
+                                   </optgroup>
+                                   <optgroup label="Dados Comerciais do Contrato">
+                                     <option value="db_rent_value">Contrato: Valor do aluguel</option>
+                                     <option value="db_due_day">Contrato: Dia de vencimento</option>
+                                     <option value="db_start_date">Contrato: Início vigência</option>
+                                     <option value="db_end_date">Contrato: Término vigência</option>
+                                   </optgroup>
+                                 </select>
                               </td>
                               <td style={{ padding: '10px 16px', textAlign: 'center' }}>
                                 <input
