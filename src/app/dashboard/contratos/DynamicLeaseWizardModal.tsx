@@ -315,9 +315,17 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
           return
         }
 
-        if (selectedTemplateId && result?.leaseId) {
+        // Suporta tanto o retorno de contrato normal quanto retroativo (objeto backfill)
+        const leaseIdToUse = result?.leaseId || (result as any)?.backfill?.leaseId
+
+        if (selectedTemplateId && leaseIdToUse) {
           const { generateContractInstanceAction } = await import('./actions')
-          await generateContractInstanceAction(selectedTemplateId, result.leaseId, dynamicValues)
+          const genResult = await generateContractInstanceAction(selectedTemplateId, leaseIdToUse, dynamicValues)
+          if (!genResult.success) {
+            setErrorMsg(genResult.error || 'Erro ao gerar documento do modelo.')
+            setIsLoading(false)
+            return
+          }
         }
       }
 
