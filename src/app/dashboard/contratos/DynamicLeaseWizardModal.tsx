@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, X, ChevronRight, ChevronLeft, FileText, CheckCircle2, AlertCircle, Info } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, X, ChevronRight, ChevronLeft, CheckCircle2, Info, Loader2, Zap } from 'lucide-react'
 import styles from '../../page.module.css'
-import { createLeaseAction, getContractTemplatesAction, getTemplateVariablesAction } from './actions'
+import { createLeaseAction, getContractTemplatesAction, getTemplateVariablesAction, getActiveLeaseByPropertyAction } from './actions'
 
 interface Props {
   properties: { id: string; name: string; status: string; address?: string | null; city?: string | null; state?: string | null }[]
@@ -28,14 +28,32 @@ interface TemplateVariable {
   tooltip_help: string | null
 }
 
+interface ActiveLeaseData {
+  id: string
+  rent_value: number
+  due_day: number
+  start_date: string
+  end_date: string | null
+  billing_start_date: string | null
+  adjustment_index: string | null
+  adjustment_period_months: number | null
+  landlord_profile_id: string | null
+  tenant_id: string
+  tenant: { id: string; name: string } | null
+}
+
 export default function DynamicLeaseWizardModal({ properties, tenants, landlordProfiles }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [templates, setTemplates] = useState<Template[]>([])
   const [detectedVariables, setDetectedVariables] = useState<TemplateVariable[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingLease, setIsLoadingLease] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+
+  // Contrato ativo carregado automaticamente
+  const [loadedFromLease, setLoadedFromLease] = useState<ActiveLeaseData | null>(null)
 
   // Step 1: Base selections
   const [selectedPropertyId, setSelectedPropertyId] = useState('')
@@ -51,11 +69,9 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
   // Step 2: Dynamic fields values
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({})
 
-
+  // ─── Carregar templates ao abrir ───────────────────────────────────────────
   useEffect(() => {
-    if (isOpen) {
-      loadTemplates()
-    }
+    if (isOpen) loadTemplates()
   }, [isOpen])
 
   const loadTemplates = async () => {
@@ -63,7 +79,37 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
     setTemplates(data as Template[])
   }
 
-  // Monitora seleção de template para buscar variáveis dinâmicas
+  // ─── Auto-preenchimento ao selecionar imóvel ──────────────────────────────
+  const handlePropertyChange = useCallback(async (propertyId: string) => {
+    setSelectedPropertyId(propertyId)
+    setLoadedFromLease(null)
+
+    if (!propertyId) return
+
+    const property = properties.find(p => p.id === propertyId)
+    if (!property || property.status === 'vacant') return
+
+    // Imóvel ocupado: buscar contrato ativo
+    setIsLoadingLease(true)
+    try {
+      const lease = await getActiveLeaseByPropertyAction(propertyId) as ActiveLeaseData | null
+      if (lease) {
+        setLoadedFromLease(lease)
+        // Preencher todos os campos com dados do contrato
+        setRentValue(String(lease.rent_value))
+        setDueDay(lease.due_day)
+        setStartDate(lease.start_date)
+        setEndDate(lease.end_date ?? '')
+        setBillingStartDate(lease.billing_start_date ?? '')
+        setSelectedTenantId(lease.tenant_id)
+        if (lease.landlord_profile_id) setSelectedProfileId(lease.landlord_profile_id)
+      }
+    } finally {
+      setIsLoadingLease(false)
+    }
+  }, [properties])
+
+  // ─── Carregar variáveis ao selecionar template ────────────────────────────
   useEffect(() => {
     if (selectedTemplateId) {
       loadVariables(selectedTemplateId)
@@ -79,7 +125,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
     setIsLoading(false)
   }
 
-  // Resolver dados do banco de dados para autopreenchimento inteligente
+  // ─── Auto-preenchimento de variáveis via dados do banco ───────────────────
   useEffect(() => {
     if (!selectedTenantId && !selectedPropertyId) return
 
@@ -93,36 +139,16 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
       let resolvedValue = ''
 
       switch (v.origin) {
-        case 'db_tenant_name':
-          resolvedValue = tenant?.name || ''
-          break
-        case 'db_tenant_document':
-          resolvedValue = tenant?.document || ''
-          break
-        case 'db_tenant_email':
-          resolvedValue = tenant?.email || ''
-          break
-        case 'db_tenant_phone':
-          resolvedValue = tenant?.phone || ''
-          break
-        case 'db_landlord_name':
-          resolvedValue = profile?.name || ''
-          break
-        case 'db_landlord_document':
-          resolvedValue = profile?.document || ''
-          break
-        case 'db_landlord_email':
-          resolvedValue = profile?.email || ''
-          break
-        case 'db_landlord_phone':
-          resolvedValue = profile?.phone || ''
-          break
-        case 'db_landlord_address':
-          resolvedValue = profile?.address || ''
-          break
-        case 'db_property_name':
-          resolvedValue = property?.name || ''
-          break
+        case 'db_tenant_name':     resolvedValue = tenant?.name || ''; break
+        case 'db_tenant_document': resolvedValue = tenant?.document || ''; break
+        case 'db_tenant_email':    resolvedValue = tenant?.email || ''; break
+        case 'db_tenant_phone':    resolvedValue = tenant?.phone || ''; break
+        case 'db_landlord_name':   resolvedValue = profile?.name || ''; break
+        case 'db_landlord_document': resolvedValue = profile?.document || ''; break
+        case 'db_landlord_email':  resolvedValue = profile?.email || ''; break
+        case 'db_landlord_phone':  resolvedValue = profile?.phone || ''; break
+        case 'db_landlord_address': resolvedValue = profile?.address || ''; break
+        case 'db_property_name':   resolvedValue = property?.name || ''; break
         case 'db_property_address':
           resolvedValue = [
             property?.address,
@@ -151,6 +177,7 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
     setDynamicValues(prev => ({ ...prev, ...initialValues }))
   }, [selectedTenantId, selectedPropertyId, selectedProfileId, rentValue, dueDay, startDate, endDate, detectedVariables])
 
+  // ─── Navegação entre steps ────────────────────────────────────────────────
   const handleNextStep = () => {
     if (currentStep === 1) {
       if (!selectedPropertyId || !selectedTenantId || !rentValue || !startDate) {
@@ -167,12 +194,12 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
     setCurrentStep(prev => prev - 1)
   }
 
+  // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setErrorMsg('')
 
-    // Validar variáveis obrigatórias
     const missing = detectedVariables.filter(v => v.is_required && !dynamicValues[v.code])
     if (missing.length > 0) {
       setErrorMsg(`Preencha todos os campos obrigatórios: ${missing.map(m => m.label).join(', ')}`)
@@ -181,56 +208,93 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
     }
 
     try {
-      const formData = new FormData()
-      formData.append('property_id', selectedPropertyId)
-      formData.append('tenant_id', selectedTenantId)
-      formData.append('rent_value', rentValue)
-      formData.append('due_day', String(dueDay))
-      formData.append('start_date', startDate)
-      formData.append('end_date', endDate)
-      formData.append('billing_start_date', billingStartDate)
-      formData.append('landlord_profile_id', selectedProfileId)
-      formData.append('lease_discounts_json', '[]')
+      // Se o imóvel já tem contrato ativo, apenas gera o documento sem criar novo lease
+      if (loadedFromLease) {
+        const { generateContractInstanceAction } = await import('./actions')
+        const result = await generateContractInstanceAction(selectedTemplateId, loadedFromLease.id, dynamicValues)
+        if (!result.success) {
+          setErrorMsg(result.error || 'Erro ao gerar documento.')
+          setIsLoading(false)
+          return
+        }
+      } else {
+        // Imóvel vago: criar novo contrato + gerar documento
+        const formData = new FormData()
+        formData.append('property_id', selectedPropertyId)
+        formData.append('tenant_id', selectedTenantId)
+        formData.append('rent_value', rentValue)
+        formData.append('due_day', String(dueDay))
+        formData.append('start_date', startDate)
+        formData.append('end_date', endDate)
+        formData.append('billing_start_date', billingStartDate)
+        formData.append('landlord_profile_id', selectedProfileId)
+        formData.append('lease_discounts_json', '[]')
 
-      // Executa criação do lease original (automóvel transacional)
-      const result = await createLeaseAction(formData)
+        const result = await createLeaseAction(formData)
 
-      if (typeof result === 'string') {
-        setErrorMsg(result)
-        setIsLoading(false)
-        return
+        if (typeof result === 'string') {
+          setErrorMsg(result)
+          setIsLoading(false)
+          return
+        }
+
+        // Gerar documento para o lease recém-criado
+        if (selectedTemplateId && result?.leaseId) {
+          const { generateContractInstanceAction } = await import('./actions')
+          await generateContractInstanceAction(selectedTemplateId, result.leaseId, dynamicValues)
+        }
       }
 
-      setSuccessMsg('Contrato de Locação efetivado com sucesso!')
+      setSuccessMsg('Contrato gerado com sucesso!')
       setTimeout(() => {
         setIsOpen(false)
-        setCurrentStep(1)
-        setSelectedPropertyId('')
-        setSelectedTenantId('')
-        setSelectedTemplateId('')
-        setRentValue('')
-        setStartDate('')
-        setEndDate('')
-        setSuccessMsg('')
+        resetForm()
       }, 1500)
 
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro ao efetivar contrato.')
+    } catch (err: unknown) {
+      setErrorMsg((err as Error).message || 'Erro ao efetivar contrato.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  const resetForm = () => {
+    setCurrentStep(1)
+    setSelectedPropertyId('')
+    setSelectedTenantId('')
+    setSelectedTemplateId('')
+    setSelectedProfileId('')
+    setRentValue('')
+    setDueDay(5)
+    setStartDate('')
+    setEndDate('')
+    setBillingStartDate('')
+    setSuccessMsg('')
+    setErrorMsg('')
+    setLoadedFromLease(null)
+    setDynamicValues({})
+  }
+
+  // ─── Styles ───────────────────────────────────────────────────────────────
   const inputStyle: React.CSSProperties = {
     background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)',
     padding: '14px', borderRadius: '12px', color: 'white', outline: 'none', width: '100%', boxSizing: 'border-box'
   }
+  const inputReadonlyStyle: React.CSSProperties = {
+    ...inputStyle,
+    background: 'rgba(99,102,241,0.06)',
+    border: '1px solid rgba(99,102,241,0.25)',
+    color: 'rgba(255,255,255,0.7)',
+    cursor: 'default'
+  }
   const labelStyle: React.CSSProperties = { fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block', fontWeight: 500 }
+
+  const isOccupied = !!loadedFromLease
 
   return (
     <>
       <button
-        onClick={() => { setIsOpen(true); setCurrentStep(1); setErrorMsg(''); setSuccessMsg('') }}
+        onClick={() => { setIsOpen(true); resetForm() }}
         className={styles.btnPrimary}
         style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none' }}
       >
@@ -242,25 +306,19 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 8, 0.85)', backdropFilter: 'blur(20px)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '40px 20px', overflowY: 'auto' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '720px', backgroundColor: 'rgba(25, 28, 38, 0.95)', padding: '32px', position: 'relative', borderRadius: '24px', boxShadow: '0 30px 60px rgba(0,0,0,1)', border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box', marginBottom: '40px' }}>
 
-            <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ position: 'absolute', top: '28px', right: '28px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button type="button" onClick={() => { setIsOpen(false); resetForm() }} disabled={isLoading} style={{ position: 'absolute', top: '28px', right: '28px', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <X size={24} />
             </button>
 
             {/* Steps Progress Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '20px' }}>
               <div style={{ display: 'flex', gap: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '28px', height: '28px', background: currentStep >= 1 ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>1</span>
-                  <span style={{ fontSize: '13px', fontWeight: currentStep === 1 ? 600 : 400, color: currentStep === 1 ? 'white' : 'var(--text-secondary)' }}>Vínculos</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '28px', height: '28px', background: currentStep >= 2 ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>2</span>
-                  <span style={{ fontSize: '13px', fontWeight: currentStep === 2 ? 600 : 400, color: currentStep === 2 ? 'white' : 'var(--text-secondary)' }}>Formulário</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '28px', height: '28px', background: currentStep >= 3 ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>3</span>
-                  <span style={{ fontSize: '13px', fontWeight: currentStep === 3 ? 600 : 400, color: currentStep === 3 ? 'white' : 'var(--text-secondary)' }}>Efetivar</span>
-                </div>
+                {[{ n: 1, label: 'Vínculos' }, { n: 2, label: 'Formulário' }, { n: 3, label: 'Efetivar' }].map(({ n, label }) => (
+                  <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '28px', height: '28px', background: currentStep >= n ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>{n}</span>
+                    <span style={{ fontSize: '13px', fontWeight: currentStep === n ? 600 : 400, color: currentStep === n ? 'white' : 'var(--text-secondary)' }}>{label}</span>
+                  </div>
+                ))}
               </div>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Passo {currentStep} de 3</span>
             </div>
@@ -277,75 +335,152 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
               </div>
             )}
 
-            {/* STEP 1: BASE VINCULUM */}
+            {/* ── STEP 1: VÍNCULOS ─────────────────────────────────────── */}
             {currentStep === 1 && (
               <div>
-                <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '8px', fontWeight: 600 }}>Parâmetros do Contrato</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Selecione o imóvel, inquilino e as condições iniciais de locação.</p>
+                <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '4px', fontWeight: 600 }}>Parâmetros do Contrato</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
+                  Selecione o imóvel. Se já houver um contrato ativo, os dados serão carregados automaticamente.
+                </p>
+
+                {/* Banner de auto-preenchimento */}
+                {isLoadingLease && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(99,102,241,0.08)', color: 'var(--accent-color)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(99,102,241,0.2)', marginBottom: '20px' }}>
+                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    Buscando contrato ativo do imóvel...
+                  </div>
+                )}
+                {loadedFromLease && !isLoadingLease && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(0,229,155,0.06)', color: 'var(--success-color)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(0,229,155,0.2)', marginBottom: '20px' }}>
+                    <Zap size={16} />
+                    <span>
+                      <strong>Dados carregados automaticamente</strong> — contrato ativo encontrado.
+                      Os campos foram preenchidos com as condições vigentes. Altere se necessário.
+                    </span>
+                  </div>
+                )}
+
+                {/* Imóvel */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>Imóvel Alvo <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                  <select
+                    value={selectedPropertyId}
+                    onChange={e => handlePropertyChange(e.target.value)}
+                    required
+                    style={inputStyle}
+                  >
+                    <option value="">-- Selecione o Imóvel --</option>
+                    {properties.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.status !== 'vacant' ? ' (Ocupado)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Imóvel Alvo <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <select value={selectedPropertyId} onChange={e => setSelectedPropertyId(e.target.value)} required style={inputStyle}>
-                      <option value="">-- Selecione o Imóvel --</option>
-                      {properties.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}{p.status !== 'vacant' ? ' (Ocupado)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Inquilino */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={labelStyle}>Inquilino <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <select value={selectedTenantId} onChange={e => setSelectedTenantId(e.target.value)} required style={inputStyle}>
+                    <select
+                      value={selectedTenantId}
+                      onChange={e => setSelectedTenantId(e.target.value)}
+                      required
+                      disabled={isOccupied}
+                      style={isOccupied ? inputReadonlyStyle : inputStyle}
+                    >
                       <option value="">-- Selecione o Inquilino --</option>
                       {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    {isOccupied && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Preenchido pelo contrato ativo</span>}
+                  </div>
+
+                  {/* Locador */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={labelStyle}>Locador (Perfil)</label>
+                    <select
+                      value={selectedProfileId}
+                      onChange={e => setSelectedProfileId(e.target.value)}
+                      style={isOccupied && loadedFromLease?.landlord_profile_id ? inputReadonlyStyle : inputStyle}
+                    >
+                      <option value="">Padrão do Sistema</option>
+                      {landlordProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  {/* Valor */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={labelStyle}>Valor R$ <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <input type="number" step="0.01" value={rentValue} onChange={e => setRentValue(e.target.value)} required placeholder="5000.00" style={inputStyle} />
+                    <input
+                      type="number" step="0.01"
+                      value={rentValue}
+                      onChange={e => setRentValue(e.target.value)}
+                      required placeholder="5000.00"
+                      style={isOccupied ? inputReadonlyStyle : inputStyle}
+                    />
                   </div>
+                  {/* Dia vencimento */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={labelStyle}>Vencimento (Dia) <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <input type="number" min="1" max="31" value={dueDay} onChange={e => setDueDay(parseInt(e.target.value) || 5)} required placeholder="05" style={inputStyle} />
+                    <input
+                      type="number" min="1" max="31"
+                      value={dueDay}
+                      onChange={e => setDueDay(parseInt(e.target.value) || 5)}
+                      required placeholder="05"
+                      style={isOccupied ? inputReadonlyStyle : inputStyle}
+                    />
                   </div>
+                  {/* Início vigência */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={labelStyle}>Início Vigência <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required style={inputStyle} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Início Faturamento <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(Opcional)</span></label>
-                    <input type="date" value={billingStartDate} onChange={e => setBillingStartDate(e.target.value)} style={inputStyle} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Término Vigência <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(Vazio = Indeterminado)</span></label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={e => setStartDate(e.target.value)}
+                      required
+                      style={isOccupied ? inputReadonlyStyle : inputStyle}
+                    />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Locador (Perfil)</label>
-                    <select value={selectedProfileId} onChange={e => setSelectedProfileId(e.target.value)} style={inputStyle}>
-                      <option value="">Padrão do Sistema</option>
-                      {landlordProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <label style={labelStyle}>Início Faturamento <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(Opcional)</span></label>
+                    <input type="date" value={billingStartDate} onChange={e => setBillingStartDate(e.target.value)} style={isOccupied ? inputReadonlyStyle : inputStyle} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={labelStyle}>Modelo Jurídico DOCX <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} required style={{ ...inputStyle, border: '1px solid rgba(74, 111, 255, 0.4)' }}>
-                      <option value="">-- Selecione o Modelo --</option>
-                      {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
+                    <label style={labelStyle}>Término Vigência <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(Vazio = Indeterminado)</span></label>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={isOccupied ? inputReadonlyStyle : inputStyle} />
                   </div>
                 </div>
+
+                {/* Modelo DOCX */}
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={labelStyle}>Modelo Jurídico DOCX <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                    required
+                    style={{ ...inputStyle, border: '1px solid rgba(74, 111, 255, 0.4)' }}
+                  >
+                    <option value="">-- Selecione o Modelo --</option>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Info modo */}
+                {isOccupied && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '12px 16px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', marginBottom: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <Info size={14} style={{ marginTop: '1px', flexShrink: 0 }} />
+                    <span>
+                      Modo <strong style={{ color: 'white' }}>Emissão de Documento</strong>: nenhum novo contrato será criado.
+                      O documento DOCX será gerado para o contrato já existente (ID: <code style={{ color: 'var(--accent-color)', fontSize: '11px' }}>{loadedFromLease.id.slice(0, 8)}…</code>).
+                      Para alterar as condições, edite o contrato na tabela primeiro.
+                    </span>
+                  </div>
+                )}
 
                 {properties.length === 0 && (
                   <div style={{ padding: '12px', background: 'var(--warning-bg)', color: 'var(--warning-color)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(255,184,74,0.15)', marginBottom: '20px' }}>
@@ -353,38 +488,34 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                   </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '32px' }}>
-                  <button type="button" onClick={() => setIsOpen(false)} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)' }}>Cancelar</button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: '8px' }}>
+                  <button type="button" onClick={() => { setIsOpen(false); resetForm() }} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}>Cancelar</button>
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    disabled={!selectedTemplateId}
+                    disabled={!selectedTemplateId || isLoadingLease}
                     style={{
-                      padding: '14px 28px',
-                      borderRadius: '12px',
-                      background: 'var(--accent-gradient)',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      opacity: !selectedTemplateId ? 0.3 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
+                      padding: '14px 28px', borderRadius: '12px', background: 'var(--accent-gradient)',
+                      color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer',
+                      opacity: (!selectedTemplateId || isLoadingLease) ? 0.3 : 1,
+                      display: 'flex', alignItems: 'center', gap: '6px'
                     }}
                   >
+                    {isLoadingLease ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
                     Próximo <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: DYNAMIC FORM MAPPING */}
+            {/* ── STEP 2: FORMULÁRIO DINÂMICO ──────────────────────────── */}
             {currentStep === 2 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <h3 style={{ fontSize: '18px', color: 'white', fontWeight: 600 }}>Campos e Variáveis Parametrizadas</h3>
                   <span style={{ fontSize: '11px', background: 'rgba(0, 229, 155, 0.1)', color: 'var(--success-color)', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>Autopreenchimento Ativo</span>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Variáveis mapeadas ao banco de dados foram preenchidas automaticamente. Complete as informações manuais pendentes.</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Variáveis mapeadas ao banco foram preenchidas automaticamente. Complete as informações manuais pendentes.</p>
 
                 {isLoading ? (
                   <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>Carregando variáveis do contrato...</p>
@@ -400,13 +531,9 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                       return (
                         <div key={v.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span>
-                              {v.label} {v.is_required && <span style={{ color: 'var(--danger-color)' }}>*</span>}
-                            </span>
+                            <span>{v.label} {v.is_required && <span style={{ color: 'var(--danger-color)' }}>*</span>}</span>
                             {isDbMapped && (
-                              <span style={{ fontSize: '10px', color: 'var(--success-color)', background: 'rgba(0,229,155,0.05)', padding: '1px 4px', borderRadius: '3px' }}>
-                                Auto
-                              </span>
+                              <span style={{ fontSize: '10px', color: 'var(--success-color)', background: 'rgba(0,229,155,0.05)', padding: '1px 4px', borderRadius: '3px' }}>Auto</span>
                             )}
                           </label>
                           <input
@@ -430,34 +557,25 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginTop: '32px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
-                  <button type="button" onClick={handlePrevStep} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button type="button" onClick={handlePrevStep} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <ChevronLeft size={16} /> Voltar
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleNextStep}
-                    style={{
-                      padding: '14px 28px',
-                      borderRadius: '12px',
-                      background: 'var(--accent-gradient)',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
+                  <button type="button" onClick={handleNextStep} style={{ padding: '14px 28px', borderRadius: '12px', background: 'var(--accent-gradient)', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     Visualizar <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 3: PREVIEW AND EMIT */}
+            {/* ── STEP 3: CONFIRMAÇÃO ───────────────────────────────────── */}
             {currentStep === 3 && (
               <form onSubmit={handleSubmit}>
-                <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '8px', fontWeight: 600 }}>Confirmação e Efetivação</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Revise o resumo do contrato parametrizado antes de gerar o documento físico.</p>
+                <h3 style={{ fontSize: '18px', color: 'white', marginBottom: '4px', fontWeight: 600 }}>Confirmação e Efetivação</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
+                  {isOccupied
+                    ? 'O documento DOCX será gerado para o contrato existente. Nenhum novo contrato será criado.'
+                    : 'Revise o resumo antes de criar o contrato e gerar o documento físico.'}
+                </p>
 
                 <div className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', fontSize: '13px' }}>
@@ -472,12 +590,24 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
                     <div>
                       <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Valor do Aluguel:</span>
                       <strong style={{ color: 'var(--success-color)' }}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(rentValue))}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(rentValue || '0'))}
                       </strong>
                     </div>
                     <div>
                       <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Data de Início:</span>
-                      <strong style={{ color: 'white' }}>{new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR')}</strong>
+                      <strong style={{ color: 'white' }}>
+                        {startDate ? new Date(startDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Modo:</span>
+                      <strong style={{ color: isOccupied ? 'var(--accent-color)' : 'var(--success-color)' }}>
+                        {isOccupied ? '📄 Emissão de Documento' : '🆕 Novo Contrato + Documento'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Modelo DOCX:</span>
+                      <strong style={{ color: 'white' }}>{templates.find(t => t.id === selectedTemplateId)?.name}</strong>
                     </div>
                   </div>
                 </div>
@@ -500,31 +630,20 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
 
                 <div style={{ padding: '12px 16px', background: 'rgba(74, 111, 255, 0.05)', color: 'var(--accent-color)', borderRadius: '12px', fontSize: '12px', border: '1px solid rgba(74,111,255,0.15)', display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <Info size={16} />
-                  <span>Ao confirmar, as transações e o arquivo DOCX/PDF serão gerados pelo motor jurídico.</span>
+                  <span>Ao confirmar, o arquivo DOCX será gerado e estará disponível para download no painel do contrato.</span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginTop: '32px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
-                  <button type="button" onClick={handlePrevStep} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button type="button" onClick={handlePrevStep} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <ChevronLeft size={16} /> Voltar
                   </button>
                   <button
                     type="submit"
                     disabled={isLoading}
-                    style={{
-                      padding: '14px 28px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: 'var(--success-bg)',
-                      color: 'var(--success-color)',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      opacity: isLoading ? 0.3 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
+                    style={{ padding: '14px 28px', borderRadius: '12px', border: 'none', background: 'var(--success-bg)', color: 'var(--success-color)', fontWeight: 'bold', cursor: 'pointer', opacity: isLoading ? 0.3 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
-                    {isLoading ? 'Emitindo...' : 'Efetivar Contrato'}
+                    {isLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                    {isLoading ? 'Gerando documento...' : isOccupied ? 'Gerar Documento DOCX' : 'Efetivar Contrato'}
                   </button>
                 </div>
               </form>
@@ -532,6 +651,10 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </>
   )
 }

@@ -1008,6 +1008,47 @@ export async function generateContractInstanceAction(
   }
 }
 
+/**
+ * Busca o contrato ativo de um imóvel para auto-preenchimento no wizard de emissão.
+ * Retorna null se não houver contrato ativo associado ao imóvel.
+ */
+export async function getActiveLeaseByPropertyAction(propertyId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data } = await supabase
+      .from('leases')
+      .select(`
+        id,
+        rent_value,
+        due_day,
+        start_date,
+        end_date,
+        billing_start_date,
+        adjustment_index,
+        adjustment_period_months,
+        landlord_profile_id,
+        guarantee_type,
+        iptu_paid_by,
+        condo_paid_by,
+        tenant_id,
+        tenant:tenants(id, name, document, email, phone)
+      `)
+      .eq('property_id', propertyId)
+      .eq('user_id', user.id)
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    return data ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function updateContractTemplateAction(
   id: string,
   name: string,
