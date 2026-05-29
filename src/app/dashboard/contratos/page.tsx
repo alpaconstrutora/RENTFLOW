@@ -70,7 +70,7 @@ export default async function ContratosPage() {
       .select(`id,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property:properties(name),tenant:tenants(name)`)
       .order('created_at', { ascending: false })
       .limit(200),
-    supabase.from('properties').select('id, name, status').limit(200),
+    supabase.from('properties').select('id, name, status, type, address, zip_code, street, street_number, district, city, state').limit(200),
     supabase.from('tenants').select('id, name, document, rg, email, phone, birth_date, marital_status, profession, nationality, zip_code, street, street_number, district, city, state, address_complement, guarantor_name, guarantor_document').limit(200),
     supabase.from('landlord_profiles').select('id, name, person_type, document, is_default, email, phone, address').order('is_default', { ascending: false }).order('name').limit(50),
   ])

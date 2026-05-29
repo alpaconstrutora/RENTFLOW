@@ -116,10 +116,28 @@ export default function TemplateManagerModal() {
       return { origin: 'db_guarantor_document', label: 'CPF/CNPJ do Fiador', field_type: 'cpf_cnpj' }
     }
     if (clean.includes('IMOVEL_NOME') || clean.includes('NOME_IMOVEL') || (clean.includes('IMOVEL') && clean.includes('NOME'))) {
-      return { origin: 'db_property_name', label: 'Nome do Imóvel', field_type: 'text' }
+      return { origin: 'db_property_name', label: 'Nome / Identificação do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_TIPO') || (clean.includes('IMOVEL') && clean.includes('TIPO'))) {
+      return { origin: 'db_property_type', label: 'Tipo do Imóvel', field_type: 'text' }
     }
     if (clean.includes('IMOVEL_ENDERECO') || clean.includes('IMOVEL_RUA') || (clean.includes('IMOVEL') && clean.includes('END'))) {
-      return { origin: 'db_property_address', label: 'Endereço do Imóvel', field_type: 'text' }
+      return { origin: 'db_property_address', label: 'Endereço Completo do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_LOGRADOURO') || clean.includes('IMOVEL_RUA') || (clean.includes('IMOVEL') && clean.includes('LOGRADOURO'))) {
+      return { origin: 'db_property_street', label: 'Logradouro do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_BAIRRO') || (clean.includes('IMOVEL') && clean.includes('BAIRRO'))) {
+      return { origin: 'db_property_district', label: 'Bairro do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_CIDADE') || (clean.includes('IMOVEL') && clean.includes('CIDADE'))) {
+      return { origin: 'db_property_city', label: 'Cidade do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_ESTADO') || clean.includes('IMOVEL_UF') || (clean.includes('IMOVEL') && (clean.includes('ESTADO') || clean.includes('UF')))) {
+      return { origin: 'db_property_state', label: 'Estado (UF) do Imóvel', field_type: 'text' }
+    }
+    if (clean.includes('IMOVEL_CEP') || (clean.includes('IMOVEL') && clean.includes('CEP'))) {
+      return { origin: 'db_property_zip_code', label: 'CEP do Imóvel', field_type: 'text' }
     }
     if (clean.includes('LOCADOR_ENDERECO') || (clean.includes('LOCADOR') && clean.includes('END')) || clean.includes('PROPRIETARIO_ENDERECO')) {
       return { origin: 'db_landlord_address', label: 'Endereço do Locador', field_type: 'text' }
@@ -667,8 +685,14 @@ export default function TemplateManagerModal() {
                                      <option value="db_landlord_address">Locador: Endereço completo</option>
                                    </optgroup>
                                    <optgroup label="Dados do Imóvel">
-                                     <option value="db_property_name">Imóvel: Identificação</option>
+                                     <option value="db_property_name">Imóvel: Identificação / Nome</option>
+                                     <option value="db_property_type">Imóvel: Tipo (Apto, Casa, Loja…)</option>
                                      <option value="db_property_address">Imóvel: Endereço completo</option>
+                                     <option value="db_property_street">Imóvel: Logradouro (Rua/Av.)</option>
+                                     <option value="db_property_district">Imóvel: Bairro</option>
+                                     <option value="db_property_city">Imóvel: Cidade</option>
+                                     <option value="db_property_state">Imóvel: Estado (UF)</option>
+                                     <option value="db_property_zip_code">Imóvel: CEP</option>
                                    </optgroup>
                                    <optgroup label="Dados Comerciais do Contrato">
                                      <option value="db_rent_value">Contrato: Valor do aluguel</option>

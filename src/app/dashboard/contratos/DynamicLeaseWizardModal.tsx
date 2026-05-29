@@ -28,7 +28,7 @@ interface TenantData {
 }
 
 interface Props {
-  properties: { id: string; name: string; status: string; address?: string | null; city?: string | null; state?: string | null }[]
+  properties: { id: string; name: string; status: string; type?: string | null; address?: string | null; zip_code?: string | null; street?: string | null; street_number?: string | null; district?: string | null; city?: string | null; state?: string | null }[]
   tenants: TenantData[]
   landlordProfiles: { id: string; name: string; person_type: string; document: string | null; is_default: boolean; email?: string | null; phone?: string | null; address?: string | null }[]
 }
@@ -91,6 +91,16 @@ function fmtMaritalStatus(s: string | null | undefined): string {
     widowed: 'Viúvo(a)', other: 'Outro'
   }
   return s ? (map[s] || s) : ''
+}
+
+/** Traduz tipo do imóvel para português */
+function fmtPropertyType(t: string | null | undefined): string {
+  const map: Record<string, string> = {
+    residential: 'Residencial', commercial: 'Comercial',
+    apartment: 'Apartamento', house: 'Casa', studio: 'Studio/Kitnet',
+    commercial_room: 'Sala Comercial', store: 'Loja', warehouse: 'Galpão/Depósito', land: 'Terreno'
+  }
+  return t ? (map[t] || t) : ''
 }
 
 export default function DynamicLeaseWizardModal({ properties, tenants, landlordProfiles }: Props) {
@@ -209,11 +219,25 @@ export default function DynamicLeaseWizardModal({ properties, tenants, landlordP
         case 'db_landlord_phone':     val = profile?.phone || ''; break
         case 'db_landlord_address':   val = profile?.address || ''; break
         // ── Imóvel ──
-        case 'db_property_name':      val = property?.name || ''; break
+        case 'db_property_name':    val = property?.name || ''; break
+        case 'db_property_type':    val = fmtPropertyType(property?.type); break
+        case 'db_property_zip_code': val = property?.zip_code || ''; break
+        case 'db_property_city':    val = property?.city || ''; break
+        case 'db_property_state':   val = property?.state || ''; break
+        case 'db_property_street':
+          val = property?.street
+            ? (property.street_number ? `${property.street}, ${property.street_number}` : property.street)
+            : ''
+          break
+        case 'db_property_district': val = property?.district || ''; break
         case 'db_property_address':
           val = [
-            property?.address,
-            property?.city && property?.state ? `${property.city} - ${property.state}` : (property?.city ?? property?.state)
+            property?.street && property?.street_number
+              ? `${property.street}, ${property.street_number}`
+              : property?.street || property?.address,
+            property?.district,
+            property?.city && property?.state ? `${property.city} - ${property.state}` : (property?.city ?? property?.state),
+            property?.zip_code ? `CEP ${property.zip_code}` : null
           ].filter(Boolean).join(', ')
           break
         // ── Contrato ──
