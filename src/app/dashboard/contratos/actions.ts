@@ -18,7 +18,7 @@ async function saveLeaseSnapshot(
 ) {
   try {
     const [{ data: leaseFullRaw }, { data: propertyRaw }, { data: discountsRaw }, userRes] = await Promise.all([
-      supabase.from('leases').select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by').eq('id', leaseId).single(),
+      supabase.from('leases').select('code, rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by').eq('id', leaseId).single(),
       supabase.from('leases').select('properties(name, address, city, state, type)').eq('id', leaseId).single(),
       supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
       supabase.auth.getUser(),
@@ -35,6 +35,7 @@ async function saveLeaseSnapshot(
       guarantee_type: leaseFullRaw.guarantee_type,
       iptu_paid_by: leaseFullRaw.iptu_paid_by,
       condo_paid_by: leaseFullRaw.condo_paid_by,
+      code: leaseFullRaw.code,
     }
 
     const [{ data: tenantRaw }, { data: landlordProfileRaw }] = await Promise.all([
@@ -645,7 +646,7 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
 
     const { data: leaseRaw } = await supabase
       .from('leases')
-      .select('rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
+      .select('code, rent_value, due_day, start_date, end_date, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
       .eq('id', leaseId)
       .single()
 
@@ -696,7 +697,7 @@ export async function sendContractEmailAction(leaseId: string): Promise<{ ok: tr
     })
 
     const buffer = await generateContratoPdfBuffer(pdfData)
-    const contractNum = leaseId.split('-')[0].toUpperCase()
+    const contractNum = leaseRaw.code ? String(leaseRaw.code).padStart(3, '0') : leaseId.split('-')[0].toUpperCase()
     const propertyName = (propertyRaw as { name: string } | null)?.name ?? 'imóvel'
 
     const resend = getResend()

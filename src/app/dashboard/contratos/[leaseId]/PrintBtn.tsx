@@ -6,19 +6,21 @@ import { useParams } from 'next/navigation'
 interface PrintBtnProps {
   downloadUrl?: string | null
   isTemplate?: boolean
+  leaseId: string
+  contractCode?: number | null
 }
 
-export default function PrintBtn({ downloadUrl, isTemplate }: PrintBtnProps) {
-  const params = useParams()
-  const leaseId = params.leaseId as string
+export default function PrintBtn({ downloadUrl, isTemplate, leaseId, contractCode }: PrintBtnProps) {
   const [loading, setLoading] = useState(false)
+
+  const formattedCode = contractCode ? String(contractCode).padStart(3, '0') : leaseId.split('-')[0]
 
   async function handleDownload() {
     if (isTemplate && downloadUrl) {
       // Inicia download direto do DOCX oficial preenchido
       const a = document.createElement('a')
       a.href = downloadUrl
-      a.download = `contrato-${leaseId.split('-')[0]}.docx`
+      a.download = `contrato-${formattedCode}.docx`
       a.click()
       return
     }
@@ -31,7 +33,7 @@ export default function PrintBtn({ downloadUrl, isTemplate }: PrintBtnProps) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `contrato-${leaseId.split('-')[0]}.pdf`
+      a.download = `contrato-${formattedCode}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {

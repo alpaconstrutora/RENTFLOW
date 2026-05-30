@@ -1,4 +1,4 @@
-import { FileText, CalendarClock, AlertTriangle, Bell } from 'lucide-react'
+import { FileText, CalendarClock, AlertTriangle, Bell, User } from 'lucide-react'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
 import LeaseButtonWithModal from './LeaseButtonWithModal'
@@ -11,6 +11,7 @@ import DynamicLeaseWizardModal from './DynamicLeaseWizardModal'
 
 interface LeaseRow {
   id: string
+  code: number
   rent_value: number
   start_date: string
   end_date: string | null
@@ -69,7 +70,7 @@ export default async function ContratosPage() {
   ] = await Promise.all([
     supabase
       .from('leases')
-      .select(`id,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property:properties(name),tenant:tenants(name),transactions(id),contract_instances(id, status)`)
+      .select(`id,code,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property:properties(name),tenant:tenants(name),transactions(id),contract_instances(id, status)`)
       .order('created_at', { ascending: false })
       .limit(200),
     supabase.from('properties').select('id, name, status, type, address, zip_code, street, street_number, district, city, state').limit(200),
@@ -103,9 +104,9 @@ export default async function ContratosPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Vínculo Jurídico (Imóvel / Inquilino)</th>
+              <th style={{ padding: '16px', fontWeight: 500 }}>Imóvel</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Rentabilidade</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Vencimento</th>
+              <th style={{ padding: '16px', fontWeight: 500 }}>Inquilino</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Vigência</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Próx. Reajuste</th>
               <th style={{ padding: '16px', fontWeight: 500, textAlign: 'right' }}>Ações</th>
@@ -126,8 +127,12 @@ export default async function ContratosPage() {
                         <FileText size={18} color="#FFCC00" />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 600 }}>{lease.property?.name}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>LOCATÁRIO: {lease.tenant?.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600 }}>{lease.property?.name}</span>
+                          <span style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            #{String(lease.code || '').padStart(3, '0')}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -142,9 +147,19 @@ export default async function ContratosPage() {
                   </td>
 
                   <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CalendarClock size={14} />
-                      Todo dia {String(lease.due_day).padStart(2, '0')}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ 
+                        background: 'rgba(0, 150, 255, 0.05)', 
+                        border: '1px solid rgba(0, 150, 255, 0.15)', 
+                        borderRadius: '6px',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <User size={14} color="#0096FF" />
+                      </div>
+                      <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{lease.tenant?.name || '—'}</span>
                     </div>
                   </td>
 

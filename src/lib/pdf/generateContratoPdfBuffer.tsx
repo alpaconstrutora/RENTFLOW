@@ -335,6 +335,7 @@ export function buildContratoPdfData(params: {
     guarantee_type: string | null
     iptu_paid_by: string | null
     condo_paid_by: string | null
+    code?: number
   }
   property: { name: string; address: string | null; city: string | null; state: string | null; type: string | null } | null
   tenant: {
@@ -382,7 +383,7 @@ export function buildContratoPdfData(params: {
     : 'nenhuma'
 
   return {
-    contractNum: leaseId.split('-')[0].toUpperCase(),
+    contractNum: lease.code ? String(lease.code).padStart(3, '0') : leaseId.split('-')[0].toUpperCase(),
     owner,
     tenant,
     property: property ? { name: property.name, city: property.city } : null,

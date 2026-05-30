@@ -76,7 +76,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
 
   const { data: lease } = await supabase
     .from('leases')
-    .select('id, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
+    .select('id, code, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
     .eq('id', leaseId)
     .single()
 
@@ -151,7 +151,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
     address:  ownerProfile?.address  ?? null,
   }
 
-  const contractNum = leaseId.split('-')[0].toUpperCase()
+  const contractNum = lease.code ? String(lease.code).padStart(3, '0') : leaseId.split('-')[0].toUpperCase()
   const today = new Date()
   const cidadeData = today.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
 
@@ -209,7 +209,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
       `}</style>
 
       <div className="print-hide" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <PrintBtn downloadUrl={downloadUrl} isTemplate={!!instanceRaw} />
+        <PrintBtn downloadUrl={downloadUrl} isTemplate={!!instanceRaw} leaseId={leaseId} contractCode={lease.code} />
         <SendContractEmailBtn leaseId={leaseId} tenantEmail={tenant?.email ?? null} />
         <a href="/dashboard/contratos" style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none' }}>
           ← Voltar aos Contratos

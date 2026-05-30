@@ -14,7 +14,7 @@ export async function GET(
 
   const { data: lease } = await supabase
     .from('leases')
-    .select('id, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
+    .select('id, code, rent_value, start_date, end_date, due_day, adjustment_index, adjustment_period_months, property_id, tenant_id, landlord_profile_id, guarantee_type, iptu_paid_by, condo_paid_by')
     .eq('id', leaseId)
     .single()
 
@@ -59,7 +59,7 @@ export async function GET(
   })
 
   const buffer = await generateContratoPdfBuffer(pdfData)
-  const contractNum = leaseId.split('-')[0].toLowerCase()
+  const contractNum = lease.code ? String(lease.code).padStart(3, '0') : leaseId.split('-')[0].toLowerCase()
 
   return new Response(new Uint8Array(buffer), {
     headers: {
