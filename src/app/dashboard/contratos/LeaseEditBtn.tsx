@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw, Trash2, Plus } from 'lucide-react'
+import { Edit, X, TrendingUp, CalendarClock, FileText, Download, RotateCcw, Trash2, Plus, AlertTriangle } from 'lucide-react'
 import { updateLeaseAction, renewLeaseAction, getAdjustmentIndexAction, getLeaseDocumentsAction, getLeaseDocumentUrlAction, getLeaseDiscountsAction } from './actions'
 
 interface Props {
@@ -19,11 +19,14 @@ interface Props {
     condo_paid_by?: string | null
     landlord_profile_id?: string | null
     guarantee_type?: string | null
+    hasTransactions?: boolean
+    isIssued?: boolean
   }
   landlordProfiles?: { id: string, name: string, person_type: string, document: string | null, is_default: boolean }[]
 }
 
 export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
+  const isReadOnly = !!(lease.hasTransactions || lease.isIssued)
   const [isOpen, setIsOpen] = useState(false)
   const [tab, setTab] = useState<'reajuste' | 'clausula' | 'renovacao' | 'documentos'>('reajuste')
   const [errorMsg, setErrorMsg] = useState('')
@@ -236,7 +239,21 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Dia do Vencto. <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <input name="due_day" type="number" min="1" max="31" defaultValue={lease.due_day} required style={inputStyle} />
+                    <input 
+                      name="due_day" 
+                      type="number" 
+                      min="1" 
+                      max="31" 
+                      defaultValue={lease.due_day} 
+                      required 
+                      readOnly={isReadOnly} 
+                      style={{ ...inputStyle, opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }} 
+                    />
+                    {isReadOnly && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-4px' }}>
+                        O dia de vencimento não pode ser alterado em contratos ativos ou emitidos.
+                      </span>
+                    )}
                   </div>
 
                   {/* I8: Preview do reajuste */}
@@ -272,6 +289,16 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
               {/* Aba: Cláusula Contratual */}
               {tab === 'clausula' && (
                 <>
+                  {/* Banner informativo de Contrato Ativo / Emitido */}
+                  {isReadOnly && (
+                    <div style={{ background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.25)', borderRadius: '12px', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <AlertTriangle size={18} color="var(--warning-color)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        <strong style={{ color: 'white' }}>Contrato Ativo / Emitido:</strong> As cláusulas estruturais fundamentais (dia de vencimento, início das parcelas, periodicidade e índice de reajuste, descontos escalonados) estão bloqueadas para manter a integridade contábil e jurídica do sistema. Para alterar o valor do aluguel, use a aba <strong style={{ color: 'white' }}>Aplicar Reajuste</strong>.
+                      </div>
+                    </div>
+                  )}
+
                   {/* Info do próximo reajuste */}
                   {lease.next_adjustment_date && (
                     <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -296,8 +323,14 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                       <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
                         Início das Parcelas
                       </label>
-                      <input name="billing_start_date" type="date" defaultValue={lease.billing_start_date?.split('T')[0] ?? ''} style={{ ...inputStyle, colorScheme: 'dark' }} />
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Alterar cancela parcelas pendentes antes desta data</span>
+                      <input 
+                        name="billing_start_date" 
+                        type="date" 
+                        defaultValue={lease.billing_start_date?.split('T')[0] ?? ''} 
+                        readOnly={isReadOnly} 
+                        style={{ ...inputStyle, colorScheme: 'dark', opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }} 
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{isReadOnly ? 'Bloqueado para contratos ativos' : 'Alterar cancela parcelas pendentes antes desta data'}</span>
                     </div>
                   </div>
 
@@ -347,26 +380,35 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       Se "Fiador", os dados são gerenciados no cadastro do inquilino.
                     </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Periodicidade do Reajuste</label>
-                      <select name="adjustment_period_months" defaultValue={lease.adjustment_period_months ?? 12} style={inputStyle}>
-                        <option value="6">A cada 6 meses</option>
-                        <option value="12">A cada 12 meses</option>
-                        <option value="24">A cada 24 meses</option>
-                        <option value="36">A cada 36 meses</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Índice Contratual</label>
-                      <select name="adjustment_index" defaultValue={lease.adjustment_index ?? 'IGPM'} style={inputStyle}>
-                        <option value="IGPM">IGP-M (FGV)</option>
-                        <option value="IPCA">IPCA (IBGE)</option>
-                        <option value="INCC">INCC</option>
-                        <option value="LIVRE">Livre Acordo</option>
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Periodicidade do Reajuste</label>
+                        <select 
+                          name="adjustment_period_months" 
+                          disabled={isReadOnly} 
+                          defaultValue={lease.adjustment_period_months ?? 12} 
+                          style={{ ...inputStyle, opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }}
+                        >
+                          <option value="6">A cada 6 meses</option>
+                          <option value="12">A cada 12 meses</option>
+                          <option value="24">A cada 24 meses</option>
+                          <option value="36">A cada 36 meses</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Índice Contratual</label>
+                        <select 
+                          name="adjustment_index" 
+                          disabled={isReadOnly} 
+                          defaultValue={lease.adjustment_index ?? 'IGPM'} 
+                          style={{ ...inputStyle, opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }}
+                        >
+                          <option value="IGPM">IGP-M (FGV)</option>
+                          <option value="IPCA">IPCA (IBGE)</option>
+                          <option value="INCC">INCC</option>
+                          <option value="LIVRE">Livre Acordo</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -379,7 +421,21 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                       <button
                         type="button"
                         onClick={addDiscountRow}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', border: '1px solid rgba(99,102,241,0.2)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                        disabled={isReadOnly}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '4px', 
+                          fontSize: '12px', 
+                          background: isReadOnly ? 'rgba(255,255,255,0.05)' : 'rgba(99,102,241,0.1)', 
+                          color: isReadOnly ? 'var(--text-muted)' : 'var(--accent-color)', 
+                          border: isReadOnly ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(99,102,241,0.2)', 
+                          padding: '6px 12px', 
+                          borderRadius: '8px', 
+                          cursor: isReadOnly ? 'not-allowed' : 'pointer', 
+                          fontWeight: 600,
+                          opacity: isReadOnly ? 0.6 : 1
+                        }}
                       >
                         <Plus size={12} style={{ display: 'inline' }} />
                         Adicionar Faixa
@@ -404,8 +460,9 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                                 type="number"
                                 min="1"
                                 value={d.start_installment}
+                                readOnly={isReadOnly}
                                 onChange={e => updateDiscountRow(idx, 'start_installment', parseInt(e.target.value) || 1)}
-                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px', opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }}
                               />
                             </div>
                             <div>
@@ -414,8 +471,9 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                                 type="number"
                                 min={d.start_installment}
                                 value={d.end_installment}
+                                readOnly={isReadOnly}
                                 onChange={e => updateDiscountRow(idx, 'end_installment', parseInt(e.target.value) || 1)}
-                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px', opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }}
                               />
                             </div>
                             <div>
@@ -426,15 +484,17 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                                 min="0"
                                 placeholder="0.00"
                                 value={d.discount_value || ''}
+                                readOnly={isReadOnly}
                                 onChange={e => updateDiscountRow(idx, 'discount_value', parseFloat(e.target.value) || 0)}
-                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px' }}
+                                style={{ ...inputStyle, padding: '8px 10px', borderRadius: '8px', fontSize: '12px', opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }}
                               />
                             </div>
                             <div style={{ paddingTop: '16px' }}>
                               <button
                                 type="button"
+                                disabled={isReadOnly}
                                 onClick={() => removeDiscountRow(idx)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px' }}
+                                style={{ background: 'transparent', border: 'none', color: isReadOnly ? 'var(--text-muted)' : 'var(--danger-color)', cursor: isReadOnly ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', padding: '6px', opacity: isReadOnly ? 0.4 : 1 }}
                               >
                                 <Trash2 size={16} />
                               </button>

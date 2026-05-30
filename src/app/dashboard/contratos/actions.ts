@@ -216,7 +216,7 @@ export async function createLeaseAction(formData: FormData) {
       const matchedDiscount = discounts.find((d: any) => installmentNum >= d.start_installment && installmentNum <= d.end_installment)
       const discountAmount = matchedDiscount ? parseFloat(matchedDiscount.discount_value) : 0
 
-      await supabase.from('transactions').insert({
+      const { error: txError } = await supabase.from('transactions').insert({
         user_id: user.id,
         lease_id: insertedLease.id,
         property_id: propertyId,
@@ -227,13 +227,14 @@ export async function createLeaseAction(formData: FormData) {
         billing_month: billingMonth, // C1: sempre dia 1 do mês
         status: 'pending'
       })
+      if (txError) return `Erro ao gerar parcela do mês corrente: ${txError.message}`
     }
 
     // I1: Detectar retroativo com base em billing_start_date, não start_date
     const startDateObj = new Date(effectiveBillingStart + 'T00:00:00Z')
     
     // I10: domain_event contract_created — SEMPRE emitido, mesmo em retroativo
-    await supabase.rpc('log_domain_event', {
+    const { error: eventError } = await supabase.rpc('log_domain_event', {
       p_event_type: 'contract_created',
       p_payload: {
         entity_id: insertedLease.id,
@@ -242,9 +243,11 @@ export async function createLeaseAction(formData: FormData) {
         context: { start_date: startDate, rent_value: rentValue, property_id: propertyId, tenant_id: tenantId }
       }
     })
+    if (eventError) return `Erro ao registrar evento de auditoria no banco: ${eventError.message}`
 
     // Calcular próximo reajuste automaticamente
-    await supabase.rpc('recalc_next_adjustment', { p_lease_id: insertedLease.id })
+    const { error: adjError } = await supabase.rpc('recalc_next_adjustment', { p_lease_id: insertedLease.id })
+    if (adjError) return `Erro ao calcular reajuste automático inicial: ${adjError.message}`
 
     if (startDateObj < currentMonthStart) {
       const startYear = startDateObj.getUTCFullYear()
@@ -981,7 +984,7 @@ export async function generateContractInstanceAction(
     const crypto = await import('crypto')
     const sha256Hash = crypto.createHash('sha256').update(generatedZipBuffer).digest('hex')
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('contract_instances')
       .update({
         generated_docx_path: docxPath,
@@ -989,6 +992,10 @@ export async function generateContractInstanceAction(
         sha256_hash: sha256Hash
       })
       .eq('id', instance.id)
+
+    if (updateError) {
+      throw new Error(`Erro ao atualizar os caminhos dos documentos gerados: ${updateError.message}`)
+    }
 
     const { data: variables } = await supabase
       .from('contract_variables')
@@ -1005,7 +1012,13 @@ export async function generateContractInstanceAction(
         }))
 
       if (valueEntries.length > 0) {
-        await supabase.from('contract_variable_values').insert(valueEntries)
+        const { error: insertVarsError } = await supabase
+          .from('contract_variable_values')
+          .insert(valueEntries)
+
+        if (insertVarsError) {
+          throw new Error(`Erro ao salvar os valores das variáveis no banco de dados: ${insertVarsError.message}`)
+        }
       }
     }
 
