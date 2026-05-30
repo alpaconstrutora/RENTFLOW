@@ -19,13 +19,17 @@ interface Props {
     condo_paid_by?: string | null
     landlord_profile_id?: string | null
     guarantee_type?: string | null
+    property_id?: string | null
+    tenant_id?: string | null
     hasTransactions?: boolean
     isIssued?: boolean
   }
   landlordProfiles?: { id: string, name: string, person_type: string, document: string | null, is_default: boolean }[]
+  properties?: { id: string, name: string }[]
+  tenants?: { id: string, name: string }[]
 }
 
-export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
+export default function LeaseEditBtn({ lease, landlordProfiles = [], properties = [], tenants = [] }: Props) {
   const isReadOnly = !!(lease.hasTransactions || lease.isIssued)
   const [isOpen, setIsOpen] = useState(false)
   const [tab, setTab] = useState<'reajuste' | 'clausula' | 'renovacao' | 'documentos'>('reajuste')
@@ -312,6 +316,60 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
                   {/* Campo hidden para garantir que rent_value e due_day sejam enviados com valores atuais */}
                   <input type="hidden" name="rent_value" value={lease.rent_value} />
                   <input type="hidden" name="due_day" value={lease.due_day} />
+
+                  {/* Novos Campos: Imóvel, Inquilino, Data de Início (editáveis se não for ReadOnly/Emitido/Com parcelas baixadas) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Imóvel <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                      {isReadOnly ? (
+                        <>
+                          <input type="text" readOnly value={properties.find(p => p.id === lease.property_id)?.name || '—'} style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
+                          <input type="hidden" name="property_id" value={lease.property_id ?? ''} />
+                        </>
+                      ) : (
+                        <select name="property_id" required defaultValue={lease.property_id ?? ''} style={inputStyle}>
+                          <option value="">Selecione um imóvel...</option>
+                          {properties.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Inquilino <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                      {isReadOnly ? (
+                        <>
+                          <input type="text" readOnly value={tenants.find(t => t.id === lease.tenant_id)?.name || '—'} style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
+                          <input type="hidden" name="tenant_id" value={lease.tenant_id ?? ''} />
+                        </>
+                      ) : (
+                        <select name="tenant_id" required defaultValue={lease.tenant_id ?? ''} style={inputStyle}>
+                          <option value="">Selecione um inquilino...</option>
+                          {tenants.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Data de Início <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                    <input 
+                      name="start_date" 
+                      type="date" 
+                      defaultValue={lease.start_date?.split('T')[0] ?? ''} 
+                      required 
+                      readOnly={isReadOnly} 
+                      style={{ ...inputStyle, colorScheme: 'dark', opacity: isReadOnly ? 0.6 : 1, cursor: isReadOnly ? 'not-allowed' : 'auto' }} 
+                    />
+                    {isReadOnly && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-4px' }}>
+                        A data de início original está bloqueada para contratos ativos/emitidos para proteger o financeiro retroativo.
+                      </span>
+                    )}
+                  </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

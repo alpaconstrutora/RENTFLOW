@@ -323,6 +323,9 @@ export async function updateLeaseAction(formData: FormData) {
     const condoPaidBy       = formData.has('condo_paid_by')        ? (formData.get('condo_paid_by')        as string) : undefined
     const landlordProfileId = formData.has('landlord_profile_id')  ? ((formData.get('landlord_profile_id') as string) || null) : undefined
     const guaranteeType     = formData.has('guarantee_type')       ? (formData.get('guarantee_type')       as string) : undefined
+    const propertyId        = formData.has('property_id')          ? (formData.get('property_id')          as string) : undefined
+    const tenantId          = formData.has('tenant_id')            ? (formData.get('tenant_id')            as string) : undefined
+    const startDate         = formData.has('start_date')           ? (formData.get('start_date')           as string) : undefined
 
     if (isNaN(newRentValue) || newRentValue <= 0) return "Valor do aluguel deve ser positivo."
 
@@ -341,6 +344,9 @@ export async function updateLeaseAction(formData: FormData) {
     if (condoPaidBy       !== undefined) updatePayload.condo_paid_by       = condoPaidBy
     if (landlordProfileId !== undefined) updatePayload.landlord_profile_id = landlordProfileId
     if (guaranteeType     !== undefined) updatePayload.guarantee_type      = guaranteeType
+    if (propertyId        !== undefined) updatePayload.property_id         = propertyId
+    if (tenantId          !== undefined) updatePayload.tenant_id           = tenantId
+    if (startDate         !== undefined) updatePayload.start_date          = startDate
 
     const { error } = await supabase.from('leases')
       .update(updatePayload)

@@ -25,6 +25,8 @@ interface LeaseRow {
   condo_paid_by: string | null
   landlord_profile_id: string | null
   guarantee_type: string | null
+  property_id: string
+  tenant_id: string
   property: { name: string } | null
   tenant: { name: string } | null
   transactions?: { id: string }[] | null
@@ -70,7 +72,7 @@ export default async function ContratosPage() {
   ] = await Promise.all([
     supabase
       .from('leases')
-      .select(`id,code,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property:properties(name),tenant:tenants(name),transactions(id),contract_instances(id, status)`)
+      .select(`id,code,rent_value,start_date,end_date,billing_start_date,due_day,active,adjustment_index,adjustment_period_months,next_adjustment_date,iptu_paid_by,condo_paid_by,landlord_profile_id,guarantee_type,property_id,tenant_id,property:properties(name),tenant:tenants(name),transactions(id),contract_instances(id, status)`)
       .order('created_at', { ascending: false })
       .limit(200),
     supabase.from('properties').select('id, name, status, type, address, zip_code, street, street_number, district, city, state').limit(200),
@@ -214,6 +216,8 @@ export default async function ContratosPage() {
                           isIssued: lease.contract_instances ? lease.contract_instances.some(ci => ['ready', 'signed', 'archived'].includes(ci.status)) : false
                         }}
                         landlordProfiles={landlordProfiles}
+                        properties={properties}
+                        tenants={tenants}
                       />
                       {lease.active ? (
                         <DistratoBtn lease={lease} />
