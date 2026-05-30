@@ -143,8 +143,8 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [] }: Props) {
         onClick={() => setIsOpen(true)}
         style={{ color: 'var(--accent-color)', fontSize: '14px', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
       >
-        <TrendingUp size={14} />
-        Reajustar
+        <Edit size={14} />
+        Editar
       </button>
 
       {isOpen && (

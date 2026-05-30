@@ -104,6 +104,7 @@ export default async function ContratosPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+              <th style={{ padding: '16px', fontWeight: 500 }}>Código</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Imóvel</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Rentabilidade</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Inquilino</th>
@@ -121,18 +122,17 @@ export default async function ContratosPage() {
 
               return (
                 <tr key={lease.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '16px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {String(lease.code || '').padStart(3, '0')}
+                  </td>
+
                   <td style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div className={styles.iconWrapper} style={{ background: 'rgba(255, 204, 0, 0.05)', border: '1px solid rgba(255, 204, 0, 0.15)' }}>
                         <FileText size={18} color="#FFCC00" />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 600 }}>{lease.property?.name}</span>
-                          <span style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                            #{String(lease.code || '').padStart(3, '0')}
-                          </span>
-                        </div>
+                        <span style={{ fontWeight: 600 }}>{lease.property?.name}</span>
                       </div>
                     </div>
                   </td>
@@ -228,7 +228,7 @@ export default async function ContratosPage() {
 
             {(!leases || leases.length === 0) && (
               <tr>
-                <td colSpan={6} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={7} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   Sem contratos de locação registrados. Efetue um novo contrato associando um Imóvel a um Cliente.
                 </td>
               </tr>
