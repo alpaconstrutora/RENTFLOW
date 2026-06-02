@@ -21,6 +21,7 @@ interface Props {
     guarantee_type?: string | null
     property_id?: string | null
     tenant_id?: string | null
+    active?: boolean
     hasTransactions?: boolean
     isIssued?: boolean
   }
@@ -293,12 +294,14 @@ export default function LeaseEditBtn({ lease, landlordProfiles = [], properties 
               {/* Aba: Cláusula Contratual */}
               {tab === 'clausula' && (
                 <>
-                  {/* Banner informativo de Contrato Ativo / Emitido */}
+                  {/* Banner informativo de Contrato Ativo / Emitido ou Finalizado / Emitido */}
                   {isReadOnly && (
                     <div style={{ background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.25)', borderRadius: '12px', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                       <AlertTriangle size={18} color="var(--warning-color)" style={{ marginTop: '2px', flexShrink: 0 }} />
                       <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        <strong style={{ color: 'white' }}>Contrato Ativo / Emitido:</strong> As cláusulas estruturais fundamentais (dia de vencimento, início das parcelas, periodicidade e índice de reajuste, descontos escalonados) estão bloqueadas para manter a integridade contábil e jurídica do sistema. Para alterar o valor do aluguel, use a aba <strong style={{ color: 'white' }}>Aplicar Reajuste</strong>.
+                        <strong style={{ color: 'white' }}>
+                          {lease.active !== false ? 'Contrato Ativo / Emitido:' : 'Contrato Finalizado / Emitido:'}
+                        </strong> As cláusulas estruturais fundamentais (dia de vencimento, início das parcelas, periodicidade e índice de reajuste, descontos escalonados) estão bloqueadas para manter a integridade contábil e jurídica do sistema. {lease.active !== false && <>Para alterar o valor do aluguel, use a aba <strong style={{ color: 'white' }}>Aplicar Reajuste</strong>.</>}
                       </div>
                     </div>
                   )}
