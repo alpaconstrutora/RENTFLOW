@@ -8,6 +8,7 @@ import DistratoBtn from './DistratoBtn'
 import RunBillingBtn from './RunBillingBtn'
 import TemplateManagerModal from './TemplateManagerModal'
 import DynamicLeaseWizardModal from './DynamicLeaseWizardModal'
+import LeaseDuplicateBtn from './LeaseDuplicateBtn'
 
 interface LeaseRow {
   id: string
@@ -218,6 +219,12 @@ export default async function ContratosPage() {
                         landlordProfiles={landlordProfiles}
                         properties={properties}
                         tenants={tenants}
+                      />
+                      <LeaseDuplicateBtn
+                        lease={lease}
+                        properties={properties}
+                        tenants={tenants}
+                        landlordProfiles={landlordProfiles}
                       />
                       {lease.active ? (
                         <DistratoBtn lease={lease} />
