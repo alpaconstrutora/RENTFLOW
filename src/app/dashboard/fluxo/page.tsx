@@ -1,19 +1,40 @@
-import { ArrowDownRight, ArrowUpRight, CalendarClock, ShieldAlert, Filter } from 'lucide-react'
+import { ShieldAlert, Filter } from 'lucide-react'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
-import TransactionAction from './TransactionAction'
 import NovaTransacaoBtn from './NovaTransacaoBtn'
 import { Suspense } from 'react'
 import FluxoFilters from './FluxoFilters'
+import FluxoTable from './FluxoTable'
 
 interface SearchParams { mes?: string; ano?: string; imovel?: string; tipo?: string; status?: string }
+
+interface TransactionRow {
+  id: string
+  type: string
+  amount: number
+  net_amount: number
+  discount_amount: number
+  addition_amount: number
+  adjustment_notes: string | null
+  due_date: string | null
+  paid_date: string | null
+  billing_month: string | null
+  status: string
+  xmin: string
+  notes: string | null
+  is_auto_generated: boolean
+  property_id: string
+  property_name: string | null
+  tenant_name: string | null
+  recurrence_group_id: string | null
+  category_id: string | null
+  created_at: string
+}
 
 export default async function FluxoPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const resolvedParams = await searchParams
   const supabase = await createClient()
 
-  // I6: Construir query filtrada via URL params (server-side)
-  // Invariante #13 — leitura via view, nunca tabela direta
   let query = supabase
     .from('transactions_view')
     .select('id, type, amount, net_amount, discount_amount, addition_amount, adjustment_notes, due_date, paid_date, billing_month, status, xmin, notes, is_auto_generated, property_id, property_name, tenant_name, recurrence_group_id, category_id, created_at')
@@ -36,7 +57,7 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
   }
 
   const [
-    { data: transactions, error },
+    { data: transactionsRaw, error },
     { data: properties },
     { data: leases },
     { data: categories },
@@ -46,23 +67,17 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
     supabase.from('properties').select('id, name').order('name').limit(200),
     supabase.from('leases').select('id, property_id, rent_value').eq('active', true).limit(200),
     supabase.from('categories').select('id, name, type').order('name').limit(100),
-    // query leve só para popular o seletor de meses — sem dados, só billing_month
     supabase.from('transactions_view').select('billing_month').order('billing_month', { ascending: false }),
   ])
 
-  // Meses únicos para o filtro (fonte separada, não limitada pelo filtro ativo)
+  const transactions = (transactionsRaw ?? []) as TransactionRow[]
+
   const uniqueMonths = [...new Set(
     allMonthsRaw?.map(t => t.billing_month?.split('T')[0] ?? '').filter(Boolean) ?? []
   )].sort().reverse()
 
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0)
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '---'
-    const [y, m, d] = dateStr.split('T')[0].split('-')
-    return `${d}/${m}/${y}`
-  }
 
-  // Totalizadores da visão atual
   const totalReceitas = transactions?.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.net_amount ?? t.amount), 0) || 0
   const totalDespesas = transactions?.filter(t => t.type === 'expense' && t.status === 'paid').reduce((s, t) => s + Number(t.net_amount ?? t.amount), 0) || 0
   const totalPendente = transactions?.filter(t => t.status === 'pending').reduce((s, t) => s + Number(t.net_amount ?? t.amount), 0) || 0
@@ -79,7 +94,6 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
 
-      {/* Totalizadores rápidos */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: 'var(--success-bg)', border: '1px solid rgba(0,229,155,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
           <p style={{ fontSize: '12px', color: 'var(--success-color)', fontWeight: 600, margin: '0 0 4px' }}>↑ Recebido (filtro atual)</p>
@@ -95,7 +109,6 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      {/* I6: Barra de filtros + I7: Export CSV */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px', marginRight: '4px' }}>
           <Filter size={14} />
@@ -121,121 +134,7 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <div className="glass-panel" style={{ padding: '20px', overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Operação / Origem</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Cliente</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Vencimento</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Liquidação</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Valor</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Status</th>
-              <th style={{ padding: '16px', fontWeight: 500, textAlign: 'right' }}>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions?.map((t) => (
-              <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                <td style={{ padding: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {t.type === 'income' ? (
-                      <div className={styles.iconWrapper} style={{ background: 'var(--success-bg)' }}>
-                        <ArrowUpRight size={18} color="var(--success-color)" />
-                      </div>
-                    ) : (
-                      <div className={styles.iconWrapper} style={{ background: 'var(--danger-bg)' }}>
-                        <ArrowDownRight size={18} color="var(--danger-color)" />
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {t.notes || (t.type === 'income' ? 'Recebimento de Aluguel' : 'Despesa Operacional')}
-                      </span>
-                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                        {t.property_name || 'N/A'}
-                        {t.is_auto_generated && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--accent-color)', background: 'rgba(99,102,241,0.1)', padding: '1px 6px', borderRadius: '4px' }}>Auto</span>}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-
-                <td style={{ padding: '16px' }}>
-                  {t.tenant_name
-                    ? <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{t.tenant_name}</span>
-                    : <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>
-                  }
-                </td>
-
-                <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CalendarClock size={14} />
-                    {formatDate(t.due_date)}
-                  </div>
-                </td>
-
-                <td style={{ padding: '16px' }}>
-                  {t.paid_date
-                    ? <span style={{ color: 'var(--success-color)', fontSize: '13px' }}>{formatDate(t.paid_date)}</span>
-                    : <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>—</span>
-                  }
-                </td>
-
-                <td style={{ padding: '16px', fontWeight: 500 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {(t.discount_amount > 0 || t.addition_amount > 0) ? (
-                      <>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', textDecoration: 'line-through' }} title="Valor Original do Contrato">
-                          {formatBRL(t.amount)}
-                        </span>
-                        <span 
-                          style={{ color: t.type === 'income' ? 'var(--success-color)' : 'var(--danger-color)' }}
-                          title={t.adjustment_notes ? `Motivo do Ajuste: ${t.adjustment_notes}` : 'Valor Ajustado'}
-                        >
-                          {t.type === 'income' ? '+' : '-'} {formatBRL(t.net_amount)}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ color: t.type === 'income' ? 'var(--success-color)' : 'var(--danger-color)' }}>
-                        {t.type === 'income' ? '+' : '-'} {formatBRL(t.amount)}
-                      </span>
-                    )}
-                  </div>
-                </td>
-
-                <td style={{ padding: '16px' }}>
-                  {t.status === 'pending' && <span style={{ color: 'var(--warning-color)', padding: '4px 10px', borderRadius: '4px', background: 'var(--warning-bg)', fontSize: '12px', fontWeight: 600 }}>Pendente</span>}
-                  {t.status === 'late' && <span style={{ color: 'var(--danger-color)', padding: '4px 10px', borderRadius: '4px', background: 'var(--danger-bg)', fontSize: '12px', fontWeight: 600 }}>Em Atraso</span>}
-                  {t.status === 'paid' && <span style={{ color: 'var(--success-color)', padding: '4px 10px', borderRadius: '4px', background: 'var(--success-bg)', fontSize: '12px', fontWeight: 600 }}>Liquidada</span>}
-                  {t.status === 'cancelled' && <span style={{ color: 'var(--text-muted)', padding: '4px 10px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', fontSize: '12px', fontWeight: 600 }}>Anulada</span>}
-                </td>
-
-                <td style={{ padding: '16px', textAlign: 'right' }}>
-                  <TransactionAction
-                    transactionId={t.id}
-                    currentStatus={t.status}
-                    xmin={t.xmin}
-                    type={t.type}
-                    isAutoGenerated={t.is_auto_generated}
-                    recurrenceGroupId={t.recurrence_group_id}
-                    notes={t.notes}
-                    dueDate={t.due_date}
-                    categories={categories ?? []}
-                  />
-                </td>
-              </tr>
-            ))}
-
-            {(!transactions || transactions.length === 0) && !error && (
-              <tr>
-                <td colSpan={7} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  Nenhuma transação encontrada com os filtros aplicados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <FluxoTable transactions={transactions} categories={categories || []} />
     </>
   )
 }

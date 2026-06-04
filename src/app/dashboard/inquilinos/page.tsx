@@ -1,11 +1,9 @@
-import { Users } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import styles from '../../page.module.css'
 import { createClient } from '../../../utils/supabase/server'
 import { getCurrentUserId } from '../../../utils/supabase/user'
 import TenantButtonWithModal from './TenantButtonWithModal'
-import TenantEditBtn from './TenantEditBtn'
-import TenantDeleteBtn from './TenantDeleteBtn'
+import TenantTable from './TenantTable'
 
 interface TenantRow {
   id: string
@@ -64,77 +62,7 @@ export default async function InquilinosPage() {
         </div>
       </header>
 
-      <div className="glass-panel" style={{ padding: '20px', overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Nome</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Documento</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Contato</th>
-              <th style={{ padding: '16px', fontWeight: 500, textAlign: 'right' }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.map(tenant => {
-              const isPJ = tenant.type === 'company'
-              return (
-                <tr key={tenant.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(74,111,255,0.1)', border: '1px solid rgba(74,111,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {tenant.photo_url ? (
-                          <img src={tenant.photo_url} alt={tenant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <Users size={18} color="var(--accent-color)" />
-                        )}
-                      </div>
-                      <div>
-                        <span style={{ fontWeight: 500, display: 'block' }}>{tenant.name}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {isPJ ? '🏢 PJ' : '👤 PF'}
-                          {tenant.profession ? ` · ${tenant.profession}` : ''}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span>{tenant.document || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}</span>
-                      {tenant.guarantor_name && (
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Fiador: {tenant.guarantor_name}</span>
-                      )}
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      {tenant.email && <span style={{ color: 'var(--text-secondary)' }}>{tenant.email}</span>}
-                      {tenant.phone && <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{tenant.phone}</span>}
-                      {!tenant.email && !tenant.phone && <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '16px' }}>
-                      <TenantEditBtn userId={userId} tenant={tenant} />
-                      <TenantDeleteBtn id={tenant.id} />
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-
-            {tenants.length === 0 && (
-              <tr>
-                <td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  Nenhum inquilino cadastrado. Clique em &quot;Cadastrar Inquilino&quot; para começar.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <TenantTable tenants={tenants} userId={userId} />
     </>
   )
 }

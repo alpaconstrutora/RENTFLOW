@@ -26,10 +26,10 @@ export default function ImovelDeleteBtn({ id }: { id: string }) {
     <button 
       onClick={handleDelete}
       disabled={isLoading}
-      style={{ color: 'var(--danger-color)', fontSize: '14px', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', opacity: isLoading ? 0.4 : 1 }}
+      title="Excluir"
+      style={{ color: 'var(--danger-color)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px', opacity: isLoading ? 0.4 : 1 }}
     >
-      <Trash2 size={14} />
-      {isLoading ? 'Limpando...' : 'Excluir'}
+      <Trash2 size={16} />
     </button>
   )
 }

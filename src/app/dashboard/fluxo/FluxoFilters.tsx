@@ -7,7 +7,7 @@ import { Download } from 'lucide-react'
 interface Props {
   months: string[]              // lista de billing_months disponíveis ex: ['2026-04-01', ...]
   properties: { id: string; name: string }[]
-  transactions: { id: string; type: string; amount: number; due_date: string; billing_month: string; status: string; notes: string | null; property_name: string | null }[]
+  transactions: { id: string; type: string; amount: number; due_date: string | null; billing_month: string | null; status: string; notes: string | null; property_name: string | null }[]
   currentYear?: string
 }
 

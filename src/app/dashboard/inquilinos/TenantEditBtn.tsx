@@ -226,9 +226,10 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        style={{ color: 'var(--accent-color)', fontSize: '14px', fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+        title="Editar"
+        style={{ color: 'var(--accent-color)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px' }}
       >
-        <Edit size={14} /> Editar
+        <Edit size={16} />
       </button>
 
       {isOpen && (
