@@ -271,7 +271,7 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
             </div>
 
             {activeTab === 'general' ? (
-              <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <input type="hidden" name="id"        value={tenant.id} />
               <input type="hidden" name="type"      value={tenantType} />
               <input type="hidden" name="photo_url" value={photoUrl ?? ''} />
@@ -288,42 +288,41 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                 ))}
               </div>
 
-              {/* ── FOTO ── */}
-              <div>
-                <p style={section}>Foto</p>
-                <div
-                  onClick={() => !photoLoading && fileRef.current?.click()}
-                  style={{ cursor: photoLoading ? 'wait' : 'pointer', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}
-                >
-                  {photoPreview ? (
-                    <>
-                      <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      {photoLoading && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Loader2 size={28} color="white" style={{ animation: 'spin 1s linear infinite' }} />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                      <Camera size={26} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                      <p style={{ fontSize: '13px', margin: 0 }}>Clique para enviar foto</p>
-                      <p style={{ fontSize: '11px', margin: '4px 0 0', opacity: 0.6 }}>JPG, PNG ou WEBP — máx. 8 MB</p>
-                    </div>
+              {/* ── FOTO & IDENTIFICAÇÃO LADO A LADO ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '16px', alignItems: 'start' }}>
+                {/* Bloco da Foto */}
+                <div>
+                  <label style={lbl}>Foto</label>
+                  <div
+                    onClick={() => !photoLoading && fileRef.current?.click()}
+                    style={{ cursor: photoLoading ? 'wait' : 'pointer', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px', height: '95px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}
+                  >
+                    {photoPreview ? (
+                      <>
+                        <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {photoLoading && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Loader2 size={20} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Camera size={20} style={{ marginBottom: '4px', opacity: 0.5 }} />
+                        <p style={{ fontSize: '10px', margin: 0 }}>Clique para enviar</p>
+                      </div>
+                    )}
+                  </div>
+                  {photoPreview && !photoLoading && (
+                    <button type="button" onClick={() => { setPhotoPreview(null); setPhotoUrl(null) }} style={{ marginTop: '4px', fontSize: '11px', color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Remover foto
+                    </button>
                   )}
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
                 </div>
-                {photoPreview && !photoLoading && (
-                  <button type="button" onClick={() => { setPhotoPreview(null); setPhotoUrl(null) }} style={{ marginTop: '8px', fontSize: '12px', color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    Remover foto
-                  </button>
-                )}
-                <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-              </div>
 
-              {/* ── IDENTIFICAÇÃO ── */}
-              <div>
-                <p style={section}>Identificação</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Bloco da Identificação */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div>
                     <label style={lbl}>Nome {tenantType === 'company' ? 'da Empresa' : 'Completo'} <span style={{ color: 'var(--danger-color)' }}>*</span></label>
                     {tenantType === 'company' ? (
@@ -335,7 +334,7 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
 
                   <div>
                     <label style={lbl}>{tenantType === 'company' ? 'CNPJ' : 'CPF'} <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <input
                         name="document" required
                         value={document}
@@ -345,16 +344,22 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                         style={{ ...inp, flex: 1, borderColor: docError ? 'var(--danger-color)' : undefined }}
                       />
                       {tenantType === 'company' && (
-                        <button type="button" onClick={handleCnpjSearch} disabled={cnpjLoading} style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                          {cnpjLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={14} />}
+                        <button type="button" onClick={handleCnpjSearch} disabled={cnpjLoading} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {cnpjLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={12} />}
                           Buscar
                         </button>
                       )}
                     </div>
-                    {docError  && <p style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px' }}>{docError}</p>}
-                    {cnpjError && <p style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px' }}>{cnpjError}</p>}
+                    {docError  && <p style={{ fontSize: '11px', color: 'var(--danger-color)', marginTop: '2px' }}>{docError}</p>}
+                    {cnpjError && <p style={{ fontSize: '11px', color: 'var(--danger-color)', marginTop: '2px' }}>{cnpjError}</p>}
                   </div>
+                </div>
+              </div>
 
+              {/* ── IDENTIFICAÇÃO ADICIONAL ── */}
+              <div>
+                <p style={section}>Identificação Adicional</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label style={lbl}>E-mail</label>
@@ -367,20 +372,24 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                   </div>
 
                   {tenantType === 'individual' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: '10px' }}>
                       <div>
                         <label style={lbl}>RG</label>
                         <input name="rg" defaultValue={tenant.rg ?? ''} placeholder="00.000.000-0" style={inp} />
                       </div>
                       <div>
-                        <label style={lbl}>Data de Nascimento</label>
+                        <label style={lbl}>Nascimento</label>
                         <input name="birth_date" type="date" defaultValue={tenant.birth_date?.split('T')[0] ?? ''} style={{ ...inp, colorScheme: 'dark' }} />
+                      </div>
+                      <div>
+                        <label style={lbl}>Renda Mensal R$</label>
+                        <input name="monthly_income" type="number" step="0.01" defaultValue={tenant.monthly_income ?? ''} placeholder="Opcional" style={inp} />
                       </div>
                     </div>
                   )}
 
                   {tenantType === 'individual' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: '10px' }}>
                       <div>
                         <label style={lbl}>Profissão</label>
                         <input name="profession" defaultValue={tenant.profession ?? ''} placeholder="Engenheiro, Médico..." style={inp} />
@@ -397,13 +406,6 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                       </div>
                     </div>
                   )}
-
-                  {tenantType === 'individual' && (
-                    <div>
-                      <label style={lbl}>Renda Mensal R$</label>
-                      <input name="monthly_income" type="number" step="0.01" defaultValue={tenant.monthly_income ?? ''} placeholder="Opcional" style={inp} />
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -411,10 +413,10 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
               {tenantType === 'individual' && (
                 <div>
                   <p style={section}>Fiador (opcional)</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '10px' }}>
                     <div>
                       <label style={lbl}>Nome do Fiador</label>
-                      <input name="guarantor_name" defaultValue={tenant.guarantor_name ?? ''} placeholder="Nome completo do fiador" style={inp} />
+                      <input name="guarantor_name" defaultValue={tenant.guarantor_name ?? ''} placeholder="Nome completo" style={inp} />
                     </div>
                     <div>
                       <label style={lbl}>CPF do Fiador</label>
@@ -433,27 +435,35 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
               {/* ── ENDEREÇO ── */}
               <div>
                 <p style={section}>Endereço</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label style={lbl}>CEP</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input name="zip_code" value={cep} placeholder="00000-000" onChange={e => setCep(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCepSearch())} style={{ ...inp, flex: 1 }} maxLength={9} />
-                      <button type="button" onClick={handleCepSearch} disabled={cepLoading} style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        {cepLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={14} />}
-                        Buscar
-                      </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* CEP e Complemento Lado a Lado */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px' }}>
+                    <div>
+                      <label style={lbl}>CEP</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input name="zip_code" value={cep} placeholder="00000-000" onChange={e => setCep(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCepSearch())} style={{ ...inp, flex: 1 }} maxLength={9} />
+                        <button type="button" onClick={handleCepSearch} disabled={cepLoading} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {cepLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={12} />}
+                          Buscar
+                        </button>
+                      </div>
+                      {cepError && <p style={{ fontSize: '11px', color: 'var(--danger-color)', marginTop: '2px' }}>{cepError}</p>}
                     </div>
-                    {cepError && <p style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px' }}>{cepError}</p>}
+
+                    <div>
+                      <label style={lbl}>Complemento</label>
+                      <input name="address_complement" defaultValue={tenant.address_complement ?? ''} placeholder="Apto 12, Bloco B" style={inp} />
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: '10px' }}>
                     <div>
                       <label style={lbl}>Rua / Logradouro</label>
                       <input name="street" value={street} onChange={e => setStreet(e.target.value)} placeholder="Rua das Flores" style={inp} />
                     </div>
                     <div>
                       <label style={lbl}>Número</label>
-                      <input name="street_number" value={streetNumber} onChange={e => setStreetNumber(e.target.value)} placeholder="42" style={{ ...inp, width: '80px' }} />
+                      <input name="street_number" value={streetNumber} onChange={e => setStreetNumber(e.target.value)} placeholder="42" style={inp} />
                     </div>
                   </div>
 
@@ -471,18 +481,13 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                       <input name="state" value={uf} onChange={e => setUf(e.target.value)} placeholder="SP" maxLength={2} style={{ ...inp, textTransform: 'uppercase' }} />
                     </div>
                   </div>
-
-                  <div>
-                    <label style={lbl}>Complemento</label>
-                    <input name="address_complement" defaultValue={tenant.address_complement ?? ''} placeholder="Apto 12, Bloco B" style={inp} />
-                  </div>
                 </div>
               </div>
 
               {/* ── OBSERVAÇÕES ── */}
               <div>
                 <label style={lbl}>Observações</label>
-                <textarea name="notes" defaultValue={tenant.notes ?? ''} rows={2} placeholder="Informações adicionais sobre o inquilino..." style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
+                <textarea name="notes" defaultValue={tenant.notes ?? ''} rows={1} placeholder="Informações adicionais sobre o inquilino..." style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
 
               {errorMsg && (
@@ -491,11 +496,11 @@ export default function TenantEditBtn({ userId, tenant }: Props) {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-                <button type="button" onClick={() => { setIsOpen(false); setActiveTab('general'); }} disabled={isLoading} style={{ padding: '12px 20px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+                <button type="button" onClick={() => { setIsOpen(false); setActiveTab('general'); }} disabled={isLoading} style={{ padding: '8px 16px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={isLoading || photoLoading} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: (isLoading || photoLoading) ? 0.7 : 1 }}>
+                <button type="submit" disabled={isLoading || photoLoading} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: (isLoading || photoLoading) ? 0.7 : 1, fontSize: '13px' }}>
                   {isLoading ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>

@@ -99,9 +99,10 @@ export default function LeaseDuplicateBtn({ lease, properties, tenants, landlord
     <>
       <button
         onClick={() => { setIsOpen(true); setBackfillInfo(null); setBackfillDone(false); setErrorMsg(''); setDiscounts([]) }}
-        style={{ fontSize: '13px', color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+        title="Duplicar"
+        style={{ color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px' }}
       >
-        <Copy size={14} /> Duplicar
+        <Copy size={16} />
       </button>
 
       {isOpen && (

@@ -132,53 +132,52 @@ export default function ImovelEditBtn({ userId, property }: Props) {
               Status é derivado de contratos — não pode ser alterado manualmente.
             </p>
 
-            <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <input type="hidden" name="id"        value={property.id} />
               <input type="hidden" name="photo_url" value={photoUrl ?? ''} />
 
-              {/* ── FOTO ── */}
-              <div>
-                <p style={section}>Foto</p>
-                <div
-                  onClick={() => !photoLoading && fileRef.current?.click()}
-                  style={{ cursor: photoLoading ? 'wait' : 'pointer', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}
-                >
-                  {photoPreview ? (
-                    <>
-                      <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      {photoLoading && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Loader2 size={28} color="white" style={{ animation: 'spin 1s linear infinite' }} />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                      <Camera size={28} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                      <p style={{ fontSize: '13px', margin: 0 }}>Clique para enviar foto</p>
-                      <p style={{ fontSize: '11px', margin: '4px 0 0', opacity: 0.6 }}>JPG, PNG ou WEBP — máx. 8 MB</p>
-                    </div>
+              {/* ── FOTO E IDENTIFICAÇÃO LADO A LADO ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '16px', alignItems: 'start' }}>
+                {/* Bloco da Foto */}
+                <div>
+                  <label style={lbl}>Foto</label>
+                  <div
+                    onClick={() => !photoLoading && fileRef.current?.click()}
+                    style={{ cursor: photoLoading ? 'wait' : 'pointer', border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'rgba(0,0,0,0.2)', position: 'relative' }}
+                  >
+                    {photoPreview ? (
+                      <>
+                        <img src={photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {photoLoading && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Loader2 size={20} color="white" style={{ animation: 'spin 1s linear infinite' }} />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Camera size={20} style={{ marginBottom: '4px', opacity: 0.5 }} />
+                        <p style={{ fontSize: '10px', margin: 0 }}>Clique para enviar</p>
+                      </div>
+                    )}
+                  </div>
+                  {photoPreview && !photoLoading && (
+                    <button type="button" onClick={() => { setPhotoPreview(null); setPhotoUrl(null) }} style={{ marginTop: '4px', fontSize: '11px', color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Remover foto
+                    </button>
                   )}
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
                 </div>
-                {photoPreview && !photoLoading && (
-                  <button type="button" onClick={() => { setPhotoPreview(null); setPhotoUrl(null) }} style={{ marginTop: '8px', fontSize: '12px', color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    Remover foto
-                  </button>
-                )}
-                <input ref={fileRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-              </div>
 
-              {/* ── IDENTIFICAÇÃO ── */}
-              <div>
-                <p style={section}>Identificação</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Bloco da Identificação */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div>
                     <label style={lbl}>Nome <span style={{ color: 'var(--danger-color)' }}>*</span></label>
                     <input name="name" defaultValue={property.name} required style={inp} />
                   </div>
                   <div>
                     <label style={lbl}>Tipo de Imóvel</label>
-                    <select name="type" defaultValue={property.type} required style={{ ...inp, appearance: 'auto' }}>
+                    <select name="type" defaultValue={property.type} required style={{ ...inp, appearance: 'auto', padding: '12px' }}>
                       {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
@@ -188,32 +187,40 @@ export default function ImovelEditBtn({ userId, property }: Props) {
               {/* ── LOCALIZAÇÃO ── */}
               <div>
                 <p style={section}>Localização</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label style={lbl}>CEP</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        name="zip_code" value={cep} placeholder="00000-000"
-                        onChange={e => setCep(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCepSearch())}
-                        style={{ ...inp, flex: 1 }} maxLength={9}
-                      />
-                      <button type="button" onClick={handleCepSearch} disabled={cepLoading} style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        {cepLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={14} />}
-                        Buscar
-                      </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* CEP e Complemento Lado a Lado */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px' }}>
+                    <div>
+                      <label style={lbl}>CEP</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          name="zip_code" value={cep} placeholder="00000-000"
+                          onChange={e => setCep(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCepSearch())}
+                          style={{ ...inp, flex: 1 }} maxLength={9}
+                        />
+                        <button type="button" onClick={handleCepSearch} disabled={cepLoading} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {cepLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={12} />}
+                          Buscar
+                        </button>
+                      </div>
+                      {cepError && <p style={{ fontSize: '11px', color: 'var(--danger-color)', marginTop: '2px' }}>{cepError}</p>}
                     </div>
-                    {cepError && <p style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px' }}>{cepError}</p>}
+
+                    <div>
+                      <label style={lbl}>Complemento</label>
+                      <input name="address" defaultValue={property.address ?? ''} placeholder="Bloco B, apto 3" style={inp} />
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: '10px' }}>
                     <div>
                       <label style={lbl}>Rua / Logradouro</label>
                       <input name="street" value={street} onChange={e => setStreet(e.target.value)} placeholder="Rua das Flores" style={inp} />
                     </div>
                     <div>
                       <label style={lbl}>Número</label>
-                      <input name="street_number" defaultValue={property.street_number ?? ''} placeholder="402" style={{ ...inp, width: '80px' }} />
+                      <input name="street_number" defaultValue={property.street_number ?? ''} placeholder="402" style={inp} />
                     </div>
                   </div>
 
@@ -231,18 +238,13 @@ export default function ImovelEditBtn({ userId, property }: Props) {
                       <input name="state" value={uf} onChange={e => setUf(e.target.value)} placeholder="SP" maxLength={2} style={{ ...inp, textTransform: 'uppercase' }} />
                     </div>
                   </div>
-
-                  <div>
-                    <label style={lbl}>Complemento</label>
-                    <input name="address" defaultValue={property.address ?? ''} placeholder="Bloco B, apto 3" style={inp} />
-                  </div>
                 </div>
               </div>
 
               {/* ── FINANCEIRO ── */}
               <div>
                 <p style={section}>Financeiro</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={lbl}>Aluguel mensal estimado R$</label>
                     <input name="expected_rent" type="number" step="0.01" defaultValue={property.expected_rent ?? ''} placeholder="3.500,00" style={inp} />
@@ -257,7 +259,7 @@ export default function ImovelEditBtn({ userId, property }: Props) {
               {/* ── OBSERVAÇÕES ── */}
               <div>
                 <label style={lbl}>Observações</label>
-                <textarea name="notes" defaultValue={property.notes ?? ''} rows={2} placeholder="Características especiais, reformas previstas..." style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
+                <textarea name="notes" defaultValue={property.notes ?? ''} rows={1} placeholder="Características especiais, reformas..." style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
               </div>
 
               {errorMsg && (
@@ -266,11 +268,11 @@ export default function ImovelEditBtn({ userId, property }: Props) {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ padding: '12px 20px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+                <button type="button" onClick={() => setIsOpen(false)} disabled={isLoading} style={{ padding: '8px 16px', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={isLoading || photoLoading} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: (isLoading || photoLoading) ? 0.7 : 1 }}>
+                <button type="submit" disabled={isLoading || photoLoading} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'var(--accent-gradient)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: (isLoading || photoLoading) ? 0.7 : 1, fontSize: '13px' }}>
                   {isLoading ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
