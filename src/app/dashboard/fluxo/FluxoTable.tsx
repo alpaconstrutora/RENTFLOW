@@ -80,8 +80,14 @@ export default function FluxoTable({ transactions: initialTransactions, categori
         valB = b.paid_date || ''
         break
       case 'value':
-        valA = a.net_amount ?? a.amount ?? 0
-        valB = b.net_amount ?? b.amount ?? 0
+        {
+          const getVal = (t: TransactionRow) => {
+            const hasAdj = (t.discount_amount && t.discount_amount > 0) || (t.addition_amount && t.addition_amount > 0)
+            return hasAdj ? (t.net_amount ?? t.amount ?? 0) : (t.amount ?? 0)
+          }
+          valA = getVal(a)
+          valB = getVal(b)
+        }
         break
       case 'status':
         valA = a.status?.toLowerCase() || ''

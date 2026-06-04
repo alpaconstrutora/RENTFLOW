@@ -179,9 +179,9 @@ export default function TransactionAction({
             <button
               onClick={() => setShowAdjustModal(true)}
               title="Ajuste"
-              style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', border: '1px solid rgba(99,102,241,0.2)', padding: '6px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+              style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', border: '1px solid rgba(99,102,241,0.2)', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
             >
-              <Wrench size={14} />
+              <Wrench size={16} />
             </button>
           )}
           {/* Recibo + Enviar por e-mail — apenas receitas liquidadas */}
@@ -192,9 +192,9 @@ export default function TransactionAction({
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Visualizar Recibo"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
               >
-                <FileText size={14} />
+                <FileText size={16} />
               </a>
               <button
                 onClick={handleSendEmail}
@@ -204,12 +204,12 @@ export default function TransactionAction({
                   background: emailSent ? 'rgba(52,211,153,0.12)' : 'rgba(129,140,248,0.1)',
                   color: emailSent ? '#34d399' : 'var(--accent-color)',
                   border: `1px solid ${emailSent ? 'rgba(52,211,153,0.3)' : 'rgba(129,140,248,0.2)'}`,
-                  padding: '6px', borderRadius: '6px', cursor: emailSent ? 'default' : 'pointer',
+                  padding: '8px', borderRadius: '8px', cursor: emailSent ? 'default' : 'pointer',
                   display: 'flex', alignItems: 'center', gap: '3px',
                   opacity: emailSending ? 0.6 : 1,
                 }}
               >
-                {emailSent ? <CheckCircle size={14} color="#34d399" /> : <Mail size={14} />}
+                {emailSent ? <CheckCircle size={16} color="#34d399" /> : <Mail size={16} />}
               </button>
             </>
           )}
@@ -223,9 +223,9 @@ export default function TransactionAction({
             onClick={handleEstornar}
             disabled={isLoading}
             title="Estornar Liquidação"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', opacity: isLoading ? 0.5 : 1 }}
+            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', opacity: isLoading ? 0.5 : 1 }}
           >
-            <Undo2 size={14} />
+            <Undo2 size={16} />
           </button>
         </div>
 
@@ -273,19 +273,19 @@ export default function TransactionAction({
         {/* Editar notas/categoria */}
         <button
           onClick={() => { setEditNotes(notes ?? ''); setShowEditModal(true) }}
-          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
           title="Editar notas"
         >
-          <Pencil size={13} />
+          <Pencil size={16} />
         </button>
 
         {/* Aplicar Desconto/Acréscimo */}
         <button
           onClick={() => setShowDiscountModal(true)}
-          style={{ background: 'rgba(255,180,0,0.1)', color: 'var(--warning-color)', border: '1px solid rgba(255,180,0,0.2)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+          style={{ background: 'rgba(255,180,0,0.1)', color: 'var(--warning-color)', border: '1px solid rgba(255,180,0,0.2)', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
           title="Aplicar Desconto ou Acréscimo"
         >
-          <Wrench size={13} />
+          <Wrench size={16} />
         </button>
 
         <button
@@ -311,10 +311,20 @@ export default function TransactionAction({
       {showLiquidarModal && (
         <div style={modalBg} onClick={() => setShowLiquidarModal(false)}>
           <div style={modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: 'white', margin: '0 0 12px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle size={16} color="var(--success-color)" />
-              Confirmar Liquidação
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle size={16} color="var(--success-color)" />
+                Confirmar Liquidação
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowLiquidarModal(false)}
+                title="Fechar"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
               Deixe em branco para usar a data de hoje.
             </p>
@@ -386,10 +396,20 @@ export default function TransactionAction({
       {showDiscountModal && (
         <div style={modalBg} onClick={() => setShowDiscountModal(false)}>
           <div style={modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: 'white', margin: '0 0 16px', fontSize: '16px' }}>
-              <Wrench size={16} style={{ marginRight: '8px', display: 'inline' }} />
-              Aplicar Desconto / Acréscimo
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Wrench size={16} style={{ marginRight: '8px', display: 'inline' }} />
+                Aplicar Desconto / Acréscimo
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDiscountModal(false)}
+                title="Fechar"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '16px', lineHeight: 1.5 }}>
               Altere o valor desta fatura adicionando descontos ou multas. O valor original será mantido no histórico para fins de auditoria.
             </p>
