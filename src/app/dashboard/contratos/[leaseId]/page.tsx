@@ -4,6 +4,9 @@ import PrintBtn from './PrintBtn'
 import SendContractEmailBtn from './SendContractEmailBtn'
 import { FileText, Download, CheckCircle, ChevronDown } from 'lucide-react'
 import styles from '../../../page.module.css'
+import Pizzip from 'pizzip'
+import Docxtemplater from 'docxtemplater'
+import { resolveVariableValue } from '../../../../utils/resolveVariables'
 
 function formatDate(d: string | null) {
   if (!d) return '—'
@@ -87,69 +90,160 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
     { data: tenantRaw },
     { data: landlordProfileRaw },
     { data: discountsRaw },
-    { data: instanceRaw }
+    { data: instanceRaw, error: instanceError }
   ] = await Promise.all([
-    supabase.from('properties').select('name, address, city, state, type').eq('id', lease.property_id).single(),
-    supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document').eq('id', lease.tenant_id).single(),
+    supabase.from('properties').select('name, address, city, state, type, zip_code, street, street_number, district').eq('id', lease.property_id).single(),
+    supabase.from('tenants').select('name, document, email, phone, street, street_number, district, city, state, guarantor_name, guarantor_document, rg, birth_date, marital_status, profession, nationality, zip_code').eq('id', lease.tenant_id).single(),
     lease.landlord_profile_id
-      ? supabase.from('landlord_profiles').select('name, document, phone, address').eq('id', lease.landlord_profile_id).single()
-      : supabase.from('landlord_profiles').select('name, document, phone, address').eq('is_default', true).maybeSingle(),
+      ? supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('id', lease.landlord_profile_id).single()
+      : supabase.from('landlord_profiles').select('name, document, phone, address, email').eq('is_default', true).maybeSingle(),
     supabase.from('lease_discounts').select('start_installment, end_installment, discount_value').eq('lease_id', leaseId).order('start_installment', { ascending: true }),
     supabase.from('contract_instances')
-      .select('id, generated_docx_path, generated_pdf_path, sha256_hash, created_at, template:contract_templates(name, version)')
+      .select('id, generated_docx_path, generated_pdf_path, sha256_hash, created_at, template:contract_templates(name, version, docx_storage_path)')
       .eq('lease_id', leaseId)
-      .eq('status', 'ready')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
   ])
 
-  let variableValues: any[] = []
-  let downloadUrl: string | null = null
-  let docxHtml: string | null = null
+  const property = propertyRaw as { name: string; address: string | null; city: string | null; state: string | null; type: string | null; zip_code?: string | null; street?: string | null; street_number?: string | null; district?: string | null } | null
+  const tenant = tenantRaw as { name: string; document: string | null; email: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null; rg?: string | null; birth_date?: string | null; marital_status?: string | null; profession?: string | null; nationality?: string | null; zip_code?: string | null } | null
 
-  if (instanceRaw) {
-    const { data: vals } = await supabase
-      .from('contract_variable_values')
-      .select('value, variable:contract_variables(code, label)')
-      .eq('instance_id', instanceRaw.id)
-    variableValues = vals ?? []
-
-    if (instanceRaw.generated_docx_path) {
-      const { data: signedData } = await supabase.storage
-        .from('lease-documents')
-        .createSignedUrl(instanceRaw.generated_docx_path, 3600)
-      if (signedData) downloadUrl = signedData.signedUrl
-
-      try {
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('lease-documents')
-          .download(instanceRaw.generated_docx_path)
-
-        if (fileData && !downloadError) {
-          const arrayBuffer = await fileData.arrayBuffer()
-          const mammoth = await import('mammoth')
-          const result = await mammoth.convertToHtml({ buffer: Buffer.from(arrayBuffer) })
-          docxHtml = result.value
-        }
-      } catch (err) {
-        console.error("Erro ao converter DOCX para HTML com mammoth:", err)
-      }
-    }
-  }
-
-  const discounts = discountsRaw ?? []
-
-  const property = propertyRaw as { name: string; address: string | null; city: string | null; state: string | null; type: string | null } | null
-  const tenant = tenantRaw as { name: string; document: string | null; email: string | null; phone: string | null; street: string | null; street_number: string | null; district: string | null; city: string | null; state: string | null; guarantor_name: string | null; guarantor_document: string | null } | null
-
-  const ownerProfile = landlordProfileRaw as { name: string; document: string | null; phone: string | null; address: string | null } | null
+  const ownerProfile = landlordProfileRaw as { name: string; document: string | null; phone: string | null; address: string | null; email: string | null } | null
   const owner = {
     name:     ownerProfile?.name     ?? user.email ?? '—',
     phone:    ownerProfile?.phone    ?? null,
     document: ownerProfile?.document ?? null,
     address:  ownerProfile?.address  ?? null,
+    email:    ownerProfile?.email    ?? null,
   }
+
+  let variableValues: any[] = []
+  let downloadUrl: string | null = null
+  let docxHtml: string | null = null
+  let conversionError: string | null = null
+  let activeTemplateName = ''
+  let activeTemplateVersion = ''
+
+  let templateToUse: any = null
+  const resolvedValues: Record<string, string> = {}
+
+  if (instanceError) {
+    conversionError = `Erro na busca do banco: ${instanceError.message}`
+  } else if (instanceRaw) {
+    // Caso exista instância, usamos o template dela e os valores salvos das variáveis
+    templateToUse = instanceRaw.template
+    activeTemplateName = (instanceRaw.template as any)?.name || ''
+    activeTemplateVersion = (instanceRaw.template as any)?.version || ''
+
+    const { data: vals } = await supabase
+      .from('contract_variable_values')
+      .select('value, variable:contract_variables(code, label)')
+      .eq('instance_id', instanceRaw.id)
+    
+    if (vals) {
+      vals.forEach(v => {
+        resolvedValues[(v.variable as any).code] = v.value
+        variableValues.push({
+          value: v.value,
+          variable: { code: (v.variable as any).code, label: (v.variable as any).label }
+        })
+      })
+    }
+  } else {
+    // Caso contrário, buscamos o modelo ativo e resolvemos as variáveis on-the-fly
+    const { data: activeTemplate } = await supabase
+      .from('contract_templates')
+      .select('id, docx_storage_path, name, version')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (activeTemplate) {
+      templateToUse = activeTemplate
+      activeTemplateName = activeTemplate.name
+      activeTemplateVersion = activeTemplate.version
+
+      const { data: variables } = await supabase
+        .from('contract_variables')
+        .select('code, origin, default_value, label')
+        .eq('template_id', activeTemplate.id)
+
+      if (variables) {
+        variables.forEach(v => {
+          const val = resolveVariableValue({
+            origin: v.origin,
+            defaultValue: v.default_value,
+            lease,
+            property,
+            tenant,
+            owner
+          })
+          resolvedValues[v.code] = val
+          variableValues.push({
+            value: val,
+            variable: { code: v.code, label: v.label }
+          })
+        })
+      }
+    }
+  }
+
+  // Preenchemos o template original em memória e convertemos para HTML de visualização
+  if (templateToUse) {
+    try {
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('lease-documents')
+        .download(templateToUse.docx_storage_path)
+
+      if (downloadError) {
+        conversionError = `Erro ao baixar modelo: ${downloadError.message}`
+      } else if (fileData) {
+        const arrayBuffer = await fileData.arrayBuffer()
+        const zip = new Pizzip(arrayBuffer)
+
+        const fileObj = zip.file ? zip.file('word/document.xml') : (zip.files ? zip.files['word/document.xml'] : null)
+        const docXml = fileObj ? fileObj.asText() : ''
+        const cleanText = docXml ? docXml.replace(/<[^>]+>/g, '') : ''
+        
+        let delimiters = { start: '{', end: '}' }
+        if (cleanText.includes('##P{')) {
+          delimiters = { start: '##P{', end: '}##' }
+        } else if (cleanText.includes('{{')) {
+          delimiters = { start: '{{', end: '}}' }
+        }
+
+        const doc = new Docxtemplater(zip, {
+          paragraphLoop: true,
+          linebreaks: true,
+          delimiters
+        })
+
+        doc.render(resolvedValues)
+
+        const generatedBuffer = doc.getZip().generate({
+          type: 'nodebuffer',
+          compression: 'DEFLATE'
+        })
+
+        const mammoth = await import('mammoth')
+        const result = await mammoth.convertToHtml({ buffer: generatedBuffer })
+        docxHtml = result.value
+        if (!docxHtml || docxHtml.trim() === '') {
+          conversionError = "O modelo convertido está vazio."
+        } else {
+          // Apontamos sempre para a nossa API de download dinâmico para garantir que baixe o arquivo limpo!
+          downloadUrl = `/api/download/contrato/${leaseId}`
+        }
+      }
+    } catch (err) {
+      conversionError = `Erro na geração/conversão dinâmica: ${(err as Error).message}`
+      console.error("Erro na conversão dinâmica:", err)
+    }
+  }
+
+  const discounts = discountsRaw ?? []
 
   const contractNum = lease.code ? String(lease.code).padStart(3, '0') : leaseId.split('-')[0].toUpperCase()
   const today = new Date()
@@ -206,17 +300,45 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
           body { background: white !important; }
           .contract-box { box-shadow: none !important; border: 1px solid #ccc !important; }
         }
+        .docx-content p {
+          margin-bottom: 1.25rem;
+          line-height: 1.6;
+          text-align: justify;
+        }
+        .docx-content h1, .docx-content h2, .docx-content h3, .docx-content h4, .docx-content h5, .docx-content h6 {
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
+          font-weight: bold;
+          line-height: 1.3;
+        }
+        .docx-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1.5rem 0;
+        }
+        .docx-content td, .docx-content th {
+          border: 1px solid #dddddd;
+          padding: 8px;
+        }
+        .docx-content ul, .docx-content ol {
+          margin-left: 2rem;
+          margin-bottom: 1rem;
+          padding-left: 0;
+        }
+        .docx-content li {
+          margin-bottom: 0.5rem;
+        }
       `}</style>
 
       <div className="print-hide" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <PrintBtn downloadUrl={downloadUrl} isTemplate={!!instanceRaw} leaseId={leaseId} contractCode={lease.code} />
+        <PrintBtn downloadUrl={downloadUrl} isTemplate={!!downloadUrl} leaseId={leaseId} contractCode={lease.code} />
         <SendContractEmailBtn leaseId={leaseId} tenantEmail={tenant?.email ?? null} />
         <a href="/dashboard/contratos" style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none' }}>
           ← Voltar aos Contratos
         </a>
       </div>
 
-      {instanceRaw && (
+      {(instanceRaw || downloadUrl) && (
         <div className="print-hide" style={{ 
           background: 'rgba(25, 28, 38, 0.6)', 
           backdropFilter: 'blur(10px)',
@@ -256,13 +378,13 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
                   display: 'block',
                   marginBottom: '2px'
                 }}>
-                  Contrato Emitido via Modelo Salvo
+                  {instanceRaw ? "Contrato Emitido via Modelo Salvo" : "Minuta Gerada On-the-fly"}
                 </span>
                 <h2 style={{ fontSize: '18px', color: 'white', margin: 0, fontWeight: 600 }}>
-                  Minuta Oficial DOCX Gerada
+                  {instanceRaw ? "Minuta Oficial DOCX Gerada" : "Modelo Ativo Preenchido"}
                 </h2>
                 <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '12px', marginTop: '2px' }}>
-                  Baseada no modelo: <strong style={{ color: 'white' }}>{(instanceRaw.template as any)?.name}</strong> (v{(instanceRaw.template as any)?.version})
+                  Baseada no modelo: <strong style={{ color: 'white' }}>{instanceRaw ? ((instanceRaw.template as any)?.name) : activeTemplateName}</strong> (v{instanceRaw ? ((instanceRaw.template as any)?.version) : activeTemplateVersion})
                 </p>
               </div>
             </div>
@@ -317,7 +439,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
                 display: 'block',
                 border: '1px solid rgba(255,255,255,0.03)'
               }}>
-                {instanceRaw.sha256_hash || '—'}
+                {instanceRaw ? (instanceRaw.sha256_hash || '—') : 'Temporário / Gerado Dinamicamente'}
               </span>
             </div>
             <div>
@@ -325,7 +447,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
                 Data de Geração Física
               </span>
               <span style={{ fontSize: '12px', color: 'white', fontWeight: 500, display: 'block', paddingTop: '4px' }}>
-                {new Date(instanceRaw.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {instanceRaw ? new Date(instanceRaw.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Gerado agora'}
               </span>
             </div>
           </div>
@@ -386,14 +508,22 @@ export default async function ContratoPage({ params }: { params: Promise<{ lease
         borderRadius: '12px', padding: '56px 64px',
         boxShadow: '0 4px 32px rgba(0,0,0,0.15)', fontFamily: 'Georgia, serif', lineHeight: 1.7,
       }}>
-        {docxHtml ? (
-          <div 
-            className="docx-content" 
-            dangerouslySetInnerHTML={{ __html: docxHtml }} 
-            style={{
-              wordBreak: 'break-word',
-            }}
-          />
+        {instanceRaw ? (
+          docxHtml ? (
+            <div 
+              className="docx-content" 
+              dangerouslySetInnerHTML={{ __html: docxHtml }} 
+              style={{
+                wordBreak: 'break-word',
+              }}
+            />
+          ) : (
+            <div style={{ padding: '24px', border: '1px dashed #ef4444', background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', borderRadius: '8px', fontSize: '14px', fontFamily: 'sans-serif' }}>
+              <strong style={{ display: 'block', marginBottom: '8px', fontSize: '16px' }}>Erro ao carregar a minuta do contrato (DOCX)</strong>
+              <p style={{ margin: '0 0 12px' }}>{conversionError || "Não foi possível carregar o conteúdo do contrato baseado no modelo DOCX."}</p>
+              <p style={{ margin: 0, fontSize: '12px', color: '#888' }}>Verifique se o arquivo do modelo foi enviado corretamente ou tente gerar o contrato novamente.</p>
+            </div>
+          )
         ) : (
           <>
             {/* Cabeçalho */}

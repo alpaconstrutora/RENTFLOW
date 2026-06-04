@@ -52,14 +52,6 @@ export default async function InquilinosPage() {
 
   const tenants = (tenantsRaw ?? []) as TenantRow[]
 
-  function addressLine(t: TenantRow): string | null {
-    if (t.street) {
-      const parts = [t.street, t.street_number, t.district, t.city && t.state ? `${t.city} - ${t.state}` : t.city].filter(Boolean)
-      return parts.join(', ')
-    }
-    return null
-  }
-
   return (
     <>
       <header className={styles.header}>
@@ -73,19 +65,17 @@ export default async function InquilinosPage() {
       </header>
 
       <div className="glass-panel" style={{ padding: '20px', overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
               <th style={{ padding: '16px', fontWeight: 500 }}>Nome</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Documento</th>
               <th style={{ padding: '16px', fontWeight: 500 }}>Contato</th>
-              <th style={{ padding: '16px', fontWeight: 500 }}>Endereço</th>
               <th style={{ padding: '16px', fontWeight: 500, textAlign: 'right' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {tenants.map(tenant => {
-              const addr = addressLine(tenant)
               const isPJ = tenant.type === 'company'
               return (
                 <tr key={tenant.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -108,7 +98,7 @@ export default async function InquilinosPage() {
                     </div>
                   </td>
 
-                  <td style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span>{tenant.document || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}</span>
                       {tenant.guarantor_name && (
@@ -117,16 +107,12 @@ export default async function InquilinosPage() {
                     </div>
                   </td>
 
-                  <td style={{ padding: '16px', fontSize: '13px' }}>
+                  <td style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       {tenant.email && <span style={{ color: 'var(--text-secondary)' }}>{tenant.email}</span>}
                       {tenant.phone && <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{tenant.phone}</span>}
                       {!tenant.email && !tenant.phone && <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}
                     </div>
-                  </td>
-
-                  <td style={{ padding: '16px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px' }}>
-                    {addr || <span style={{ fontStyle: 'italic' }}>—</span>}
                   </td>
 
                   <td style={{ padding: '16px', textAlign: 'right' }}>
@@ -141,7 +127,7 @@ export default async function InquilinosPage() {
 
             {tenants.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <td colSpan={4} style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   Nenhum inquilino cadastrado. Clique em &quot;Cadastrar Inquilino&quot; para começar.
                 </td>
               </tr>

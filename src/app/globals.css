@@ -1,29 +1,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
 
 :root {
-  --bg-color: #0f1014;
-  --bg-card: #18191f;
-  --bg-card-hover: #1e1f26;
+  --bg-color: #f4f6fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbfc;
 
-  --text-primary: #ffffff;
-  --text-secondary: #9496a1;
-  --text-muted: #5e606a;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
 
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
+  --border-color: #eef2f6;
+  --border-hover: #e2e8f0;
 
   --accent-color: #4a6fff;
-  --accent-hover: #5d7eff;
+  --accent-hover: #3b5ddb;
   --accent-gradient: linear-gradient(135deg, #4a6fff 0%, #8250df 100%);
 
-  --success-color: #00e59b;
-  --success-bg: rgba(0, 229, 155, 0.1);
+  --success-color: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.06);
 
-  --danger-color: #ff4a6b;
-  --danger-bg: rgba(255, 74, 107, 0.1);
+  --danger-color: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.06);
 
-  --warning-color: #ffb84a;
-  --warning-bg: rgba(255, 184, 74, 0.1);
+  --warning-color: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.06);
+
+  /* Variáveis dedicadas para a Sidebar (escura) */
+  --sidebar-bg: #0b1329;
+  --sidebar-text-primary: #ffffff;
+  --sidebar-text-secondary: rgba(255, 255, 255, 0.6);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
 
   --font-body: 'Inter', sans-serif;
   --font-heading: 'Outfit', sans-serif;
@@ -33,9 +39,9 @@
   --radius-lg: 20px;
   --radius-xl: 32px;
 
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
-  --shadow-glow: 0 0 20px rgba(74, 111, 255, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
+  --shadow-glow: 0 0 20px rgba(74, 111, 255, 0.15);
 }
 
 * {
@@ -73,11 +79,12 @@ button {
 
 /* Utils and Layout Helpers */
 .glass-panel {
-  background: rgba(24, 25, 31, 0.6);
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Animations */

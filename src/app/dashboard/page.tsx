@@ -129,24 +129,23 @@ export default async function Dashboard() {
           </p>
         </div>
         <form action="/auth/signout" method="post">
-          <button className={styles.btnPrimary} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'white', boxShadow: 'none' }}>Sair</button>
+          <button className={styles.btnPrimary} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', boxShadow: 'none' }}>Sair</button>
         </form>
       </header>
 
-      {/* ── LINHA 1: DRE DO MÊS */}
-      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
         <span>
           <Activity size={14} style={{ display: 'inline', marginRight: '8px' }} />
           Resultado do Mês
         </span>
       </h2>
-      <div className={styles.gridCards} style={{ marginBottom: '32px' }}>
+      <div className={styles.gridCards} style={{ marginBottom: '18px' }}>
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <span>Lucro Real (DRE)</span>
-            <div className={`${styles.iconWrapper} ${styles.iconIncome}`} style={{ background: 'rgba(255,255,255,0.08)' }}><Wallet size={20} color="white" /></div>
+            <div className={`${styles.iconWrapper} ${styles.iconIncome}`} style={{ background: 'rgba(74, 111, 255, 0.08)' }}><Wallet size={20} color="var(--accent-color)" /></div>
           </div>
-          <span className={styles.cardValue} style={{ color: netProfit >= 0 ? 'white' : 'var(--danger-color)' }}>{formatBRL(netProfit)}</span>
+          <span className={styles.cardValue} style={{ color: netProfit >= 0 ? 'var(--text-primary)' : 'var(--danger-color)' }}>{formatBRL(netProfit)}</span>
           <div className={styles.cardLabel}>Receitas pagas menos despesas do mês</div>
         </div>
         <div className={styles.card}>
@@ -168,17 +167,17 @@ export default async function Dashboard() {
       </div>
 
       {/* ── LINHA 1.5: PERFORMANCE ANUAL (YTD) E CICLO */}
-      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         <Trophy size={14} style={{ display: 'inline', marginRight: '8px' }} color="var(--accent-color)" />
         Performance Anual e Ciclo ({yr})
       </h2>
-      <div className={styles.gridCards} style={{ marginBottom: '32px' }}>
+      <div className={styles.gridCards} style={{ marginBottom: '18px' }}>
         <div className={styles.card} style={{ border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.03)' }}>
           <div className={styles.cardHeader}>
             <span>Lucro Acumulado (YTD)</span>
             <div className={styles.iconWrapper} style={{ background: 'var(--accent-color)' }}><Wallet size={20} color="white" /></div>
           </div>
-          <span className={styles.cardValue} style={{ color: netProfitYtd >= 0 ? 'var(--accent-color)' : 'var(--danger-color)', fontSize: '28px' }}>{formatBRL(netProfitYtd)}</span>
+          <span className={styles.cardValue} style={{ color: netProfitYtd >= 0 ? 'var(--accent-color)' : 'var(--danger-color)', fontSize: '22px' }}>{formatBRL(netProfitYtd)}</span>
           <div className={styles.cardLabel} style={{ display: 'flex', gap: '8px', color: 'var(--text-secondary)' }}>
             <span style={{ color: 'var(--success-color)' }}>Rec: {formatBRL(totalIncomeYtd)}</span>
             <span style={{ color: 'var(--danger-color)' }}>Desp: {formatBRL(totalExpenseYtd)}</span>
@@ -190,7 +189,7 @@ export default async function Dashboard() {
             <span>Tempo Médio Recebimento</span>
             <div className={styles.iconWrapper} style={{ background: 'rgba(255,255,255,0.05)' }}><Activity size={20} color="var(--text-muted)" /></div>
           </div>
-          <span className={styles.cardValue} style={{ color: Number(tmrAvg) > 5 ? 'var(--warning-color)' : 'var(--success-color)', fontSize: '28px' }}>
+          <span className={styles.cardValue} style={{ color: Number(tmrAvg) > 5 ? 'var(--warning-color)' : 'var(--success-color)', fontSize: '22px' }}>
             {tmrAvg} <span style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: 500 }}>dias</span>
           </span>
           <div className={styles.cardLabel}>Média de atraso nas faturas (12m)</div>
@@ -198,11 +197,11 @@ export default async function Dashboard() {
       </div>
 
       {/* ── LINHA 2: RISCOS E OCUPAÇÃO */}
-      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+      <h2 style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         <AlertTriangle size={14} style={{ display: 'inline', marginRight: '8px' }} color="var(--warning-color)" />
         Risco e Ocupação
       </h2>
-      <div className={styles.gridCards} style={{ marginBottom: '32px' }}>
+      <div className={styles.gridCards} style={{ marginBottom: '18px' }}>
         {/* I3: Inadimplência % */}
         <div className={styles.card} style={{ border: totalLate > 0 ? '1px solid rgba(255,80,80,0.4)' : '1px solid var(--border-color)', background: totalLate > 0 ? 'rgba(255,10,10,0.04)' : '' }}>
           <div className={styles.cardHeader}>
@@ -227,7 +226,7 @@ export default async function Dashboard() {
             <span>Taxa de Vacância</span>
             <div className={styles.iconWrapper}><DoorOpen size={20} color="var(--text-secondary)" /></div>
           </div>
-          <span className={styles.cardValue} style={{ color: Number(vacancyRate) > 20 ? 'var(--warning-color)' : 'white' }}>{vacancyRate}%</span>
+          <span className={styles.cardValue} style={{ color: Number(vacancyRate) > 20 ? 'var(--warning-color)' : 'var(--text-primary)' }}>{vacancyRate}%</span>
           <div className={styles.cardLabel}>{totalProps! - (rentedProps || 0)} vagos de {totalProps || 0} imóveis</div>
         </div>
 
@@ -254,7 +253,7 @@ export default async function Dashboard() {
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Clock size={14} color="var(--warning-color)" /> Vencimentos D-7
             </span>
-            <span style={{ background: vencD7 && vencD7.length > 0 ? 'var(--warning-bg)' : 'rgba(255,255,255,0.05)', color: vencD7 && vencD7.length > 0 ? 'var(--warning-color)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 700 }}>
+            <span style={{ background: vencD7 && vencD7.length > 0 ? 'var(--warning-bg)' : 'rgba(0,0,0,0.03)', color: vencD7 && vencD7.length > 0 ? 'var(--warning-color)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 700 }}>
               {vencD7?.length || 0}
             </span>
           </div>
@@ -279,7 +278,7 @@ export default async function Dashboard() {
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CalendarX size={14} color="var(--danger-color)" /> Contratos expirando
             </span>
-            <span style={{ background: expiringLeases && expiringLeases.length > 0 ? 'var(--danger-bg)' : 'rgba(255,255,255,0.05)', color: expiringLeases && expiringLeases.length > 0 ? 'var(--danger-color)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 700 }}>
+            <span style={{ background: expiringLeases && expiringLeases.length > 0 ? 'var(--danger-bg)' : 'rgba(0,0,0,0.03)', color: expiringLeases && expiringLeases.length > 0 ? 'var(--danger-color)' : 'var(--text-muted)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 700 }}>
               {expiringLeases?.length || 0}
             </span>
           </div>
@@ -341,11 +340,11 @@ export default async function Dashboard() {
                 ? isOverdue ? 'Contrato Vencido!' : `Vence em ${alert.days_remaining} dias`
                 : isOverdue ? 'Reajuste Atrasado!' : `Reajuste em ${alert.days_remaining} dias`
               return (
-                <div key={`${alert.lease_id}-${alert.alert_type}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: i < leaseAlertsData.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div key={`${alert.lease_id}-${alert.alert_type}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: i < leaseAlertsData.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '20px' }}>{icon}</span>
                     <div>
-                      <span style={{ color: 'white', fontSize: '14px', fontWeight: 600 }}>{alert.property_name}</span>
+                      <span style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600 }}>{alert.property_name}</span>
                       <span style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'block' }}>
                         {alert.tenant_name}{!isExpiring && alert.adjustment_index ? ` · Índice: ${alert.adjustment_index}` : ''}
                       </span>

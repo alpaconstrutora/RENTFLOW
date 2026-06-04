@@ -81,17 +81,17 @@ export default async function FluxoPage({ searchParams }: { searchParams: Promis
 
       {/* Totalizadores rápidos */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: 'var(--success-bg)', border: '1px solid rgba(0,255,100,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
+        <div style={{ background: 'var(--success-bg)', border: '1px solid rgba(0,229,155,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
           <p style={{ fontSize: '12px', color: 'var(--success-color)', fontWeight: 600, margin: '0 0 4px' }}>↑ Recebido (filtro atual)</p>
-          <p style={{ fontSize: '22px', color: 'white', fontWeight: 700, margin: 0 }}>{formatBRL(totalReceitas)}</p>
+          <p style={{ fontSize: '22px', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>{formatBRL(totalReceitas)}</p>
         </div>
-        <div style={{ background: 'var(--danger-bg)', border: '1px solid rgba(255,50,50,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
+        <div style={{ background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
           <p style={{ fontSize: '12px', color: 'var(--danger-color)', fontWeight: 600, margin: '0 0 4px' }}>↓ Pago em Despesas</p>
-          <p style={{ fontSize: '22px', color: 'white', fontWeight: 700, margin: 0 }}>{formatBRL(totalDespesas)}</p>
+          <p style={{ fontSize: '22px', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>{formatBRL(totalDespesas)}</p>
         </div>
-        <div style={{ background: 'rgba(255,180,0,0.05)', border: '1px solid rgba(255,180,0,0.2)', borderRadius: '14px', padding: '16px 20px' }}>
+        <div style={{ background: 'var(--warning-bg)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '14px', padding: '16px 20px' }}>
           <p style={{ fontSize: '12px', color: 'var(--warning-color)', fontWeight: 600, margin: '0 0 4px' }}>⏳ A Vencer / Pendente</p>
-          <p style={{ fontSize: '22px', color: 'white', fontWeight: 700, margin: 0 }}>{formatBRL(totalPendente)}</p>
+          <p style={{ fontSize: '22px', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>{formatBRL(totalPendente)}</p>
         </div>
       </div>
 

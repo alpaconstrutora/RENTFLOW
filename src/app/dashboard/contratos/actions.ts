@@ -930,9 +930,20 @@ export async function generateContractInstanceAction(
     const arrayBuffer = await fileData.arrayBuffer()
     const zip = new Pizzip(arrayBuffer)
     
+    const docXml = zip.files['word/document.xml'] ? zip.files['word/document.xml'].asText() : ''
+    const cleanText = docXml.replace(/<[^>]+>/g, '')
+    
+    let delimiters = { start: '{', end: '}' }
+    if (cleanText.includes('##P{')) {
+      delimiters = { start: '##P{', end: '}##' }
+    } else if (cleanText.includes('{{')) {
+      delimiters = { start: '{{', end: '}}' }
+    }
+
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
-      linebreaks: true
+      linebreaks: true,
+      delimiters
     })
 
     doc.render(variableValues)
